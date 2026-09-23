@@ -161,6 +161,9 @@ header.top{padding:40px 0 4px}
 .g-list{margin:0;display:grid;gap:8px}
 .g-list div{display:flex;justify-content:space-between;gap:10px;font-size:.9rem}
 .g-list dt{color:var(--mute)} .g-list dd{margin:0;font-weight:600}
+.livedot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--warn);margin-right:7px;vertical-align:1px;box-shadow:0 0 0 0 rgba(209,41,61,.5);animation:pulse 1.8s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(209,41,61,.45)}70%{box-shadow:0 0 0 8px rgba(209,41,61,0)}100%{box-shadow:0 0 0 0 rgba(209,41,61,0)}}
+.g-src{margin:10px 0 2px;font-size:.8rem;color:var(--faint)}
 .glance .scrub{border-top:1px solid var(--border);margin-top:4px;padding-top:14px}
 @media (max-width:900px){
   .g-grid{grid-template-columns:1fr 1fr}
@@ -286,7 +289,7 @@ td.t{font-weight:600}
   .alm-row{grid-template-columns:1fr}
   .alm-rwx{text-align:left}
 }
-@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
 </style>
 </head>
 <body>
@@ -631,6 +634,41 @@ async function raceWinner(r){
   }catch{return null;}
 }
 
+/* ================= live observations (nearest NWS station) ================= */
+function milesBetween(a,b,c,d){const R=3958.8,r=Math.PI/180,x=Math.sin((c-a)*r/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin((d-b)*r/2)**2;return 2*R*Math.asin(Math.sqrt(x));}
+async function loadObs(stationsUrl,lat,lon){
+  if(!stationsUrl) return null;
+  const st=await getJSON(stationsUrl,{tries:2,timeout:12000});
+  for(const f of (st.features||[]).slice(0,4)){
+    try{
+      const id=f.properties.stationIdentifier;
+      const o=(await getJSON(`https://api.weather.gov/stations/${id}/observations/latest`,{tries:1,timeout:10000})).properties;
+      if(o.temperature?.value==null) continue;
+      const t=Date.parse(o.timestamp); if(Date.now()-t>2.5*HOUR) continue; // too old to call "live"
+      const val=q=>q&&q.value!=null?q:null, C=q=>q?(/degC/.test(q.unitCode)?c2f(q.value):q.value):null;
+      const mph=q=>q?(/km_h/.test(q.unitCode)?q.value*0.621371:/m_s/.test(q.unitCode)?q.value*2.23694:q.value):null;
+      const [lo,la]=f.geometry?.coordinates||[];
+      const temp=C(val(o.temperature)), feels=C(val(o.heatIndex))??C(val(o.windChill))??temp, text=o.textDescription||'';
+      const precip=val(o.precipitationLastHour)?o.precipitationLastHour.value/25.4:null;
+      return {obs:true, t, station:f.properties.name||id, miles:la!=null?milesBetween(lat,lon,la,lo):null,
+        temp, feels, dew:C(val(o.dewpoint)), rh:val(o.relativeHumidity)?Math.round(o.relativeHumidity.value):null,
+        mph:val(o.windSpeed)?Math.round(mph(o.windSpeed)):null, dir:val(o.windDirection)?o.windDirection.value:null,
+        gust:val(o.windGust)?mph(o.windGust):null, short:text, qpf:precip,
+        vis:val(o.visibility)?o.visibility.value/1609.34:null, inHg:val(o.barometricPressure)?o.barometricPressure.value/3386.39:null,
+        pop:/rain|shower|drizzle|thunder|snow|sleet/i.test(text)?60:0};
+    }catch{}
+  }
+  return null;
+}
+function isOver(g){
+  const st=g.status||{};
+  if(g.golf) return st.state==='post'||!!st.completed||g.day<ymd(new Date());
+  if(st.state==='post'||st.completed) return true;
+  if(st.state==='in') return false;
+  const L=LEAGUES[g.league], hrs=L.kind==='baseball'?3:L.kind==='racing'?L.dur:3.5;
+  return Date.parse(g.date)+(hrs+3)*HOUR<Date.now(); // fallback when a feed has no live status
+}
+
 /* ================= list view ================= */
 function renderChips(){
   const groups=[['Baseball','baseball'],['Football','football'],['NASCAR','racing'],['Golf','golf']];
@@ -649,9 +687,10 @@ function renderDays(){
     return `<button class="day" data-day="${i}" aria-current="${state.day===i}"><span>${top}</span><b>${d.toLocaleDateString('en-US',{month:'short',day:'numeric'})}</b></button>`;
   }).join('');
 }
-async function loadDay(){
+async function loadDay(quiet){
   const date=ymd(dayDate(state.day)); const want=[...state.leagues];
-  state.loading=true; state.errors={}; renderList();
+  if(quiet) want.forEach(l=>state.cache.delete(l+date));
+  else{ state.loading=true; state.errors={}; renderList(); }
   const results=await Promise.allSettled(want.map(l=>loadScoreboard(l,date)));
   if(ymd(dayDate(state.day))!==date) return;
   state.games=[];
@@ -672,11 +711,12 @@ function renderList(){
   const box=$('#list');
   if(state.loading){box.innerHTML='<p class="empty">Loading schedules…</p>'; return;}
   const q=state.query.trim().toLowerCase();
-  let games=state.games.filter(g=>state.leagues.has(g.league));
+  const picked=state.games.filter(g=>state.leagues.has(g.league));
+  let games=picked.filter(g=>!isOver(g));
   if(q) games=games.filter(g=>[g.home.name,g.away?.name,g.home.abbr,g.away?.abbr,g.venue.name,g.venue.city,g.venue.state,g.racing?LEAGUES[g.league].full:''].join(' ').toLowerCase().includes(q));
   const errs=Object.entries(state.errors).map(([l,m])=>`<p class="status err">Couldn't load the ${LEAGUES[l].label} schedule (${esc(m)}). The other leagues are shown below.</p>`).join('');
   if(!state.leagues.size){box.innerHTML='<p class="empty">Turn on at least one league above to see games.</p>';return;}
-  if(!games.length){box.innerHTML=errs+`<p class="empty">${q?'No games match that filter on this date.':'No games on this date for the leagues you picked. Try another day, or turn another league on.'}</p>`;return;}
+  if(!games.length){box.innerHTML=errs+`<p class="empty">${q?'Nothing matches that filter on this date.':picked.length?'Everything on this date has finished. Try another day.':'Nothing on this date for the leagues you picked. Try another day, or turn another league on.'}</p>`;return;}
   const slots=new Map();
   for(const g of games){const k=g.golf?'Golf, all day':new Date(g.date).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); if(!slots.has(k)) slots.set(k,[]); slots.get(k).push(g);}
   box.innerHTML=errs+[...slots].map(([time,gs])=>`<div class="slot"><h2>${time}</h2>${gs.map(gameRow).join('')}</div>`).join('');
@@ -887,7 +927,7 @@ async function loadNWS(lat,lon){
       if(v){const[,d]=v.validTime.split('/');h.qpf=(v.value||0)/25.4/Math.max(1,isoDur(d)/HOUR);}
     }
   }
-  return {tz:pr.timeZone, place:pr.relativeLocation?.properties, hours,
+  return {tz:pr.timeZone, place:pr.relativeLocation?.properties, hours, stationsUrl:pr.observationStations,
     hourlyErr:hr.status==='rejected'?hr.reason:null,
     updated:hr.status==='fulfilled'?hr.value.properties.updateTime:null,
     periods:fc.status==='fulfilled'?fc.value.properties.periods||[]:[],
@@ -999,7 +1039,7 @@ function pickStyle(){
 
 /* ================= detail view ================= */
 let detail=null; // live objects for teardown
-function teardown(){ if(detail){detail.wind?.stop(); detail.map?.remove(); detail.ro?.disconnect(); detail.ro2?.disconnect(); detail=null;} }
+function teardown(){ if(detail){clearInterval(detail.timer); detail.wind?.stop(); detail.map?.remove(); detail.ro?.disconnect(); detail.ro2?.disconnect(); detail=null;} }
 
 function heroHTML(g,tz){
   const L=LEAGUES[g.league], t=Date.parse(g.date);
@@ -1069,9 +1109,11 @@ function renderDetail(g,kind,venue,wx,orient){
 
   /* forecast selection */
   const hours=wx.hours||[];
-  const over=now>t0+dur+HOUR;
+  const st=g.status||{};
+  const over=now>t0+dur+HOUR||(!g.golf&&(st.state==='post'||!!st.completed))||(g.golf&&(st.state==='post'||g.day<ymd(new Date())));
+  const live=!over&&(g.golf?now>=t0&&now<=t0+dur:(st.state==='in'||(now>=t0&&now<=t0+dur)));
   const anchorT=over?floorHour(now)+HOUR:t0;
-  const covered=hours.length&&anchorT>=hours[0].t-HOUR&&anchorT<=hours[hours.length-1].t+HOUR;
+  const covered=!live&&hours.length&&anchorT>=hours[0].t-HOUR&&anchorT<=hours[hours.length-1].t+HOUR;
   const kickIdx=covered?hours.reduce((bi,h,i)=>Math.abs(h.t-floorHour(anchorT))<Math.abs(hours[bi].t-floorHour(anchorT))?i:bi,0):-1;
   const scrub=covered?hours.filter(h=>h.t>=floorHour(anchorT)-2*HOUR&&h.t<=anchorT+dur):[];
   const period=(wx.periods||[]).find(p=>anchorT>=Date.parse(p.startTime)&&anchorT<Date.parse(p.endTime));
@@ -1087,7 +1129,7 @@ function renderDetail(g,kind,venue,wx,orient){
       :`The National Weather Service didn't answer (${esc(wx.error.message)}). Their API has brief outages; reload in a minute to try again.`;
   }else if(over){
     msg=`This ${eventWord(kind)} has ended. Showing the current forecast at the venue instead.`;
-  }else if(!covered){
+  }else if(!covered&&!live){
     msg=hours.length?`Hourly detail isn't out yet. The NWS publishes hourly forecasts about 6 to 7 days ahead, so check back closer to ${startWord}.${period?' The day forecast below covers game time.':''}`
       :`The hourly forecast didn't load${wx.hourlyErr?` (${esc(wx.hourlyErr.message)})`:''}. Reload to try again.`;
   }
@@ -1114,7 +1156,7 @@ function renderDetail(g,kind,venue,wx,orient){
   <section class="blk"><h2>Hour by hour</h2><div class="chart" id="chart"></div>
     <div class="tablewrap"><table id="htable"></table></div></section>`:''}
   <section class="blk"><h2>The almanac</h2><div id="almanac"><p class="alm-loading">${kind==='golf'?'Looking up the weather at this course on the same day last year…':kind==='racing'?'Looking up the last race at this track, and the weather that day…':'Looking up the last time these two met, and the weather that day…'}</p></div></section>
-  ${(wx.periods||[]).length?`<section class="blk"><h2>From the forecaster</h2><div class="nwstext" id="nwstext"></div></section>`:''}
+  ${(wx.periods||[]).length&&!live?`<section class="blk"><h2>From the forecaster</h2><div class="nwstext" id="nwstext"></div></section>`:''}
   <p class="fine">Forecast: National Weather Service (api.weather.gov)${wx.updated?`, updated ${esc(fTime(Date.parse(wx.updated),tz))} ${esc(fmt(Date.parse(wx.updated),tz,{month:'short',day:'numeric'}))}`:''}.
   Schedules and past results: ESPN and NASCAR. Past-game weather: Open-Meteo historical data (reanalysis estimates for the venue location). Map: OpenFreeMap and OpenStreetMap contributors; satellite imagery by Esri. Wind descriptions use field orientation from OpenStreetMap when available and are approximate. Times on this page are in the venue's local time (${esc(tz)}).</p>`;
 
@@ -1173,8 +1215,8 @@ function renderDetail(g,kind,venue,wx,orient){
   /* ---- hour selection ---- */
   const periodHour=period?{t:anchorT,temp:period.temperature,mph:parseWind(period.windSpeed),dir:card2deg(period.windDirection),card:period.windDirection,
     pop:period.probabilityOfPrecipitation?.value??null,short:period.shortForecast,rh:null,dew:null,feels:null,gust:null,sky:null,qpf:null,fromPeriod:true}:null;
-  let sel=kickIdx;
-  const curHour=()=>sel>=0?hours[sel]:periodHour;
+  let sel=live?-1:kickIdx, liveHour=null; const token=state.viewToken;
+  const curHour=()=>live?liveHour:sel>=0?hours[sel]:periodHour;
   function updateHour(i){
     sel=i; const h=curHour();
     document.querySelectorAll('#scrub .hr').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.i===i));
@@ -1189,13 +1231,16 @@ function renderDetail(g,kind,venue,wx,orient){
   }
   function verdict(h){
     const t=h.temp, tw=t==null?'':t<40?'Cold':t<55?'Chilly':t<68?'Mild':t<80?'Warm':t<90?'Hot':'Very hot';
-    const pop=h.pop??0, rw=pop>=60?'rain likely':pop>=30?'a chance of showers':'dry';
+    const pop=h.pop??0, sk=h.short||'';
+    const rw=h.obs?(/thunder/i.test(sk)?'stormy':/snow|sleet/i.test(sk)?'snowy':/rain|shower|drizzle/i.test(sk)?'wet':'dry'):pop>=60?'rain likely':pop>=30?'a chance of showers':'dry';
     const m=h.mph??0, ww=m<8?'light winds':m<15?'a steady breeze':m<22?'breezy':'strong winds';
     return `${tw} and ${rw}, ${ww}.`;
   }
   function renderNow(h,rel){
     const box=$('#now');
+    if(live&&(!h||h.fallback&&h.temp==null)){box.innerHTML=`<div class="g-top"><div><span class="g-when"><span class="livedot"></span>Live</span><p class="g-verdict">${h?'Current conditions are unavailable right now.':'Getting current conditions at the venue…'}</p></div></div>`;return;}
     if(!h){box.innerHTML=`<div class="g-top"><div><span class="g-when">Game-time conditions</span><p class="g-verdict">No forecast for game time yet.</p></div></div>`;return;}
+    if(live) return renderLive(h,rel,box);
     const isKick=sel===kickIdx&&!over&&!h.fromPeriod;
     const head=h.fromPeriod?`${esc(period.name)} forecast`:isKick?`At ${startWord}, ${fTime(t0,tz)}`:over&&sel===kickIdx?`Now, ${fHour(h.t,tz)}`:`At ${fHour(h.t,tz)}`;
     const gust=h.gust&&h.gust>(h.mph||0)+4?rnd(h.gust):null;
@@ -1212,12 +1257,38 @@ function renderDetail(g,kind,venue,wx,orient){
           ${row('Humidity',h.rh!=null?h.rh+'%':null)}${row('Dew point',h.dew!=null?rnd(h.dew)+'°':null)}${row('Sky cover',h.sky!=null?h.sky+'%':null)}</dl></div>
       </div>`;
   }
+  function renderLive(h,rel,box){
+    const gust=h.gust&&h.gust>(h.mph||0)+4?rnd(h.gust):null;
+    const row=(k,v)=>`<div><dt>${k}</dt><dd>${v??'–'}</dd></div>`;
+    const src=h.obs?`Observed ${fTime(h.t,tz)} at ${esc(h.station)}${h.miles!=null?` (${Math.round(h.miles)} mi away)`:''}. Updates every 5 minutes.`
+      :'No recent station report, so this is the forecast for the current hour.';
+    box.innerHTML=`<div class="g-top"><div><span class="g-when"><span class="livedot"></span>Live at the venue</span><p class="g-verdict">${esc(verdict(h))}</p></div></div>
+      <div class="g-grid">
+        <div class="g-cell g-temp"><span class="g-lbl">Temperature</span><div class="g-big">${rnd(h.temp)}°</div>
+          <span class="g-sub"><b>${esc(h.short||'')}</b>${h.feels!=null&&Math.abs(h.feels-h.temp)>=1?`<br>Feels like ${rnd(h.feels)}°`:''}</span></div>
+        <div class="g-cell g-wind"><span class="g-lbl">Wind</span><div class="g-mid">${h.mph??'–'}<small>mph ${h.dir!=null?esc(deg2card(h.dir)):''}</small></div>
+          <span class="g-sub">${gust?`<b>Gusts to ${gust} mph.</b> `:''}${esc(rel)}</span></div>
+        <div class="g-cell g-rain"><span class="g-lbl">${h.obs?'Rain, last hour':'Rain chance'}</span><div class="g-mid">${h.obs?(h.qpf!=null?(h.qpf<0.005?'0':h.qpf.toFixed(2)):'–'):(h.pop??'–')}<small>${h.obs?'in':'%'}</small></div>
+          <span class="g-sub">${h.vis!=null?`Visibility ${h.vis>=9.5?'10+':Math.round(h.vis)} mi`:''}</span></div>
+        <div class="g-cell"><span class="g-lbl">Comfort</span><dl class="g-list">
+          ${row('Humidity',h.rh!=null?h.rh+'%':null)}${row('Dew point',h.dew!=null?rnd(h.dew)+'°':null)}${h.obs?row('Pressure',h.inHg!=null?h.inHg.toFixed(2)+' in':null):row('Sky cover',h.sky!=null?h.sky+'%':null)}</dl></div>
+      </div><p class="g-src">${src}</p>`;
+  }
   $('#scrub')?.addEventListener('click',e=>{const b=e.target.closest('.hr');if(b)updateHour(+b.dataset.i);});
 
   if(covered){ renderTrends(); renderChart(); renderTable(); }
-  if((wx.periods||[]).length) renderPeriods();
+  if((wx.periods||[]).length&&!live) renderPeriods();
   updateHour(sel);
-  loadAlmanac(g,kind,covered&&!over?hours[kickIdx]:periodHour,state.viewToken);
+  loadAlmanac(g,kind,live?null:covered&&!over?hours[kickIdx]:periodHour,state.viewToken);
+  if(live){ // pull current observations now and every 5 minutes
+    const refresh=async()=>{
+      const o=await loadObs(wx.stationsUrl,venue.lat,venue.lon).catch(()=>null);
+      if(token!==state.viewToken) return;
+      if(o) liveHour=o; else if(!liveHour||!liveHour.obs) liveHour={...(hours.find(h=>h.t===floorHour(Date.now()))||periodHour||{}),fallback:true};
+      updateHour(-1);
+    };
+    refresh(); detail.timer=setInterval(refresh,5*60e3);
+  }
 
   function renderTrends(){
     const win=hours.filter(h=>h.t>=floorHour(anchorT)&&h.t<=anchorT+dur);
@@ -1485,6 +1556,8 @@ $('#list').addEventListener('click',e=>{const b=e.target.closest('[data-go]');if
 $('#back').addEventListener('click',()=>{ location.hash=''; });
 window.addEventListener('hashchange',route);
 renderChips(); renderDays(); route();
+setInterval(()=>{ if(!$('#list-view').hidden&&!document.hidden&&!state.loading) loadDay(true); },2*60e3);
+setInterval(()=>{ if(!$('#list-view').hidden) renderList(); },60e3);
 if(location.hash) loadDay();
 </script>
 </body>
