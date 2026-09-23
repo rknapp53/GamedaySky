@@ -1243,18 +1243,18 @@ function renderDetail(g,kind,venue,wx,orient){
     const narrow=avail<600;
     const H0=floorHour(anchorT)-2*HOUR, H1=anchorT+dur+1*HOUR;
     const hs=hours.filter(h=>h.t>=H0&&h.t<=H1); if(hs.length<3){$('#chart').innerHTML='';return;}
-    const W=Math.max(280,Math.round(avail||900)),Ht=narrow?260:300,pl=narrow?34:42,pr=narrow?16:14,pt=18,plotB=Ht-100;
+    const W=Math.max(280,Math.round(avail||900)),Ht=narrow?260:300,pl=narrow?40:52,pr=narrow?8:12,pt=22,plotB=Ht-100;
     const colW=(W-pl-pr)/hs.length, lblEvery=Math.max(1,Math.ceil(52/colW)), tEvery=Math.max(2,Math.ceil(40/colW)), wEvery=Math.max(1,Math.ceil(24/colW));
-    const tMin=hs[0].t,tMax=hs[hs.length-1].t, x=t=>pl+(t-tMin)/(tMax-tMin)*(W-pl-pr);
+    const tMin=hs[0].t,tMax=hs[hs.length-1].t, x=t=>pl+colW/2+(t-tMin)/(tMax-tMin)*(W-pl-pr-colW);
     const vals=hs.flatMap(h=>[h.temp,h.feels].filter(v=>v!=null));
     const lo=Math.floor((Math.min(...vals)-3)/5)*5, hi=Math.ceil((Math.max(...vals)+3)/5)*5;
     const y=v=>pt+(hi-v)/(hi-lo)*(plotB-pt);
     const step=hi-lo>30?10:5; let grid='';
     for(let v=lo;v<=hi;v+=step) grid+=`<line x1="${pl}" x2="${W-pr}" y1="${y(v)}" y2="${y(v)}" stroke="rgba(16,24,40,0.10)" stroke-width="1"/><text x="${pl-8}" y="${y(v)+4}" text-anchor="end" fill="#6B7485" font-size="12">${v}°</text>`;
-    const bw=(W-pl-pr)/hs.length*0.6;
+    const bw=Math.min(colW*0.5,26);
     const bars=hs.map(h=>{const bh=(h.pop||0)/100*(plotB-pt)*0.5;return bh?`<rect x="${x(h.t)-bw/2}" y="${plotB-bh}" width="${bw}" height="${bh}" fill="#6D7BF0" opacity=".55" rx="2"><title>${fHour(h.t,tz)}: ${h.pop}% rain chance</title></rect>`:'';}).join('');
     const path=k=>hs.filter(h=>h[k]!=null).map((h,i)=>`${i?'L':'M'}${x(h.t).toFixed(1)},${y(h[k]).toFixed(1)}`).join('');
-    const gx0=x(Math.max(tMin,anchorT)), gx1=x(Math.min(tMax,anchorT+dur));
+    const gx0=Math.max(pl,x(Math.max(tMin,floorHour(anchorT)))-colW/2), gx1=Math.min(W-pr,x(Math.min(tMax,floorHour(anchorT+dur)))+colW/2);
     const labels=hs.map((h,i)=>i%lblEvery?'':`<text x="${x(h.t)}" y="${plotB+18}" text-anchor="middle" fill="#6B7485" font-size="12">${fHour(h.t,tz)}</text>`).join('');
     const winds=hs.map((h,i)=>h.dir==null||i%wEvery?'':`<g transform="translate(${x(h.t)},${plotB+48})"><g transform="rotate(${norm360(h.dir+180)})"><path d="M0,-9 L5,3 L0,0 L-5,3 Z" fill="#0A7CC4"/></g></g>
       <text x="${x(h.t)}" y="${plotB+74}" text-anchor="middle" fill="#121826" font-size="11">${h.mph}</text>`).join('');
