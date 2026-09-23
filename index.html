@@ -39,11 +39,22 @@ header.top{padding:40px 0 4px}
 .brand{display:flex;align-items:flex-end;justify-content:space-between;gap:12px 32px;flex-wrap:wrap}
 .brand h1{font-weight:600;font-size:clamp(2rem,4.6vw,3rem);line-height:1;letter-spacing:-.035em;margin:0}
 .brand p{margin:0;color:var(--mute);max-width:44ch;font-size:.95rem}
-.controls{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:32px 0 18px}
-.chips{display:inline-flex;gap:2px;padding:4px;border-radius:999px;background:var(--surface);border:1px solid var(--border)}
-.chip{border:0;background:transparent;padding:7px 16px;border-radius:999px;font-weight:500;font-size:.88rem;color:var(--mute);transition:background .15s,color .15s}
+.controls{display:flex;flex-wrap:wrap;gap:14px 18px;align-items:flex-end;margin:32px 0 18px}
+/* league picker: one segmented track per sport */
+.leagues{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 14px;min-width:0}
+.lgroup{display:flex;flex-direction:column;gap:6px;flex:none}
+.lgl{align-self:flex-start;border:0;background:none;padding:0 2px;font-size:.74rem;font-weight:500;color:var(--faint);transition:color .15s}
+.lgl:hover{color:var(--text)}
+.seg{display:inline-flex;gap:2px;padding:3px;border-radius:12px;background:var(--bg-2)}
+.chip{display:inline-flex;align-items:center;gap:7px;border:0;background:transparent;padding:6px 12px;border-radius:9px;
+  font-weight:500;font-size:.86rem;color:var(--faint);white-space:nowrap;transition:background .15s,color .15s,box-shadow .15s}
+.chip::before{content:"";width:7px;height:7px;border-radius:50%;border:1.5px solid currentColor;opacity:.55;transition:all .15s}
 .chip:hover{color:var(--text)}
-.chip[aria-pressed="true"]{background:var(--text);color:var(--bg)}
+.chip[aria-pressed="true"]{background:var(--surface);color:var(--text);box-shadow:0 1px 2px rgba(16,24,40,.08),0 2px 8px -3px rgba(16,24,40,.14)}
+.chip[aria-pressed="true"]::before{background:var(--dot);border-color:var(--dot);opacity:1}
+.lgroup.baseball{--dot:#0A7CC4}.lgroup.football{--dot:#2F9E44}.lgroup.racing{--dot:#E07A00}.lgroup.golf{--dot:#0E9F8F}
+.allbtn{border:0;background:none;color:var(--wind);font-weight:500;font-size:.84rem;padding:8px 4px;white-space:nowrap;flex:none}
+.allbtn:hover{text-decoration:underline}
 .search{flex:1 1 240px;max-width:360px;margin-left:auto;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:9px 18px;transition:border-color .15s}
 .search:focus{border-color:var(--border-2);outline:none}
 .search::placeholder{color:var(--faint)}
@@ -178,7 +189,7 @@ button,.game,.hr,.chip,.day{touch-action:manipulation;-webkit-tap-highlight-colo
   .game:active{background:var(--surface-2)}
 }
 @media (pointer:coarse){
-  .chip{padding:10px 16px}
+  .chip{padding:9px 13px}
   .btn{padding:10px 16px}
   .hr{padding:10px 10px}
 }
@@ -186,8 +197,9 @@ button,.game,.hr,.chip,.day{touch-action:manipulation;-webkit-tap-highlight-colo
   .wrap{padding:0 14px}
   header.top{padding-top:24px}
   .controls{margin:22px 0 14px}
-  .chips{width:100%;display:flex;flex-wrap:wrap;border-radius:18px}
-  .chip{flex:1 1 18%;padding-left:6px;padding-right:6px}
+  .leagues{gap:10px 10px}
+  .chip{padding:8px 11px;gap:6px}
+  .search{flex-basis:100%}
   #map{height:clamp(320px,56vh,460px);height:clamp(320px,56svh,460px)}
   .mapwrap{border-radius:18px}
   .compass{width:64px;height:64px;left:10px;top:10px}
@@ -286,7 +298,7 @@ td.t{font-weight:600}
         <p>Pick a game, race or golf round. Get the National Weather Service forecast for that stadium or track, hour by hour, with the wind drawn over it.</p>
       </div>
       <div class="controls">
-        <div class="chips" role="group" aria-label="Leagues" id="chips"></div>
+        <div class="leagues" role="group" aria-label="Leagues" id="chips"></div>
         <input class="search" id="search" type="search" placeholder="Filter by team, event or venue" aria-label="Filter by team, event or venue">
       </div>
       <nav class="days" id="days" aria-label="Choose a date"></nav>
@@ -621,8 +633,13 @@ async function raceWinner(r){
 
 /* ================= list view ================= */
 function renderChips(){
-  $('#chips').innerHTML=Object.entries(LEAGUES).map(([k,L])=>
-    `<button class="chip" data-lg="${k}" aria-pressed="${state.leagues.has(k)}">${L.label}</button>`).join('');
+  const groups=[['Baseball','baseball'],['Football','football'],['NASCAR','racing'],['Golf','golf']];
+  const all=Object.keys(LEAGUES).every(k=>state.leagues.has(k));
+  $('#chips').innerHTML=groups.map(([label,kind])=>{
+    const keys=Object.keys(LEAGUES).filter(k=>LEAGUES[k].kind===kind);
+    return `<div class="lgroup ${kind}"><button class="lgl" data-group="${kind}" title="Toggle all ${label.toLowerCase()}">${label}</button>
+      <div class="seg">${keys.map(k=>`<button class="chip" data-lg="${k}" aria-pressed="${state.leagues.has(k)}"${LEAGUES[k].full?` title="${esc(LEAGUES[k].full)}"`:''}>${esc(LEAGUES[k].label)}</button>`).join('')}</div></div>`;
+  }).join('')+`<button class="allbtn" data-all="${all?'none':'all'}">${all?'Clear all':'Select all'}</button>`;
 }
 function dayDate(i){const d=new Date(); d.setHours(12,0,0,0); d.setDate(d.getDate()+i); return d;}
 function renderDays(){
@@ -1451,10 +1468,16 @@ function route(){
   else{ state.viewToken++; teardown(); $('#detail-view').hidden=true; $('#list-view').hidden=false; if(!state.games.length&&!state.loading) loadDay(); else requestAnimationFrame(()=>scrollTo(0,state.listY||0)); }
 }
 $('#chips').addEventListener('click',e=>{
-  const b=e.target.closest('.chip'); if(!b) return; const k=b.dataset.lg;
-  state.leagues.has(k)?state.leagues.delete(k):state.leagues.add(k); store.set('leagues3',[...state.leagues]); renderChips();
+  const b=e.target.closest('.chip,.lgl,.allbtn'); if(!b) return;
+  let keys;
+  if(b.dataset.lg) keys=[b.dataset.lg];
+  else if(b.dataset.group) keys=Object.keys(LEAGUES).filter(k=>LEAGUES[k].kind===b.dataset.group);
+  else keys=Object.keys(LEAGUES);
+  const turnOn=b.dataset.all?b.dataset.all==='all':!keys.every(k=>state.leagues.has(k));
+  keys.forEach(k=>turnOn?state.leagues.add(k):state.leagues.delete(k));
+  store.set('leagues3',[...state.leagues]); renderChips();
   const date=ymd(dayDate(state.day));
-  if(state.leagues.has(k)&&!state.cache.has(k+date)) loadDay(); else renderList();
+  if(turnOn&&keys.some(k=>!state.cache.has(k+date))) loadDay(); else renderList();
 });
 $('#days').addEventListener('click',e=>{const b=e.target.closest('.day');if(!b)return;state.day=+b.dataset.day;renderDays();loadDay();});
 $('#search').addEventListener('input',e=>{state.query=e.target.value;renderList();});
