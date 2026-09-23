@@ -636,29 +636,55 @@ async function raceWinner(r){
 
 /* ================= live observations (nearest NWS station) ================= */
 function milesBetween(a,b,c,d){const R=3958.8,r=Math.PI/180,x=Math.sin((c-a)*r/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin((d-b)*r/2)**2;return 2*R*Math.asin(Math.sqrt(x));}
+const isAirport=id=>/^[KPT][A-Z0-9]{3}$/.test(id||''); // ICAO ids used by US airport (ASOS/AWOS) stations
+function metarWind(raw){ // e.g. "32013G22KT", "VRB03KT", "00000KT", "05006MPS"
+  const m=String(raw||'').match(/\b(\d{3}|VRB)(\d{2,3})(?:G(\d{2,3}))?(KT|MPS)\b/);
+  if(!m) return null;
+  const k=m[4]==='KT'?1.15078:2.23694;
+  return {dir:m[1]==='VRB'?null:+m[1], mph:Math.round(+m[2]*k), gust:m[3]?+m[3]*k:null, vrb:m[1]==='VRB'};
+}
+async function latestObs(id){
+  const o=(await getJSON(`https://api.weather.gov/stations/${id}/observations/latest`,{tries:1,timeout:10000})).properties;
+  const t=Date.parse(o.timestamp);
+  return Date.now()-t>2.5*HOUR?null:{o,t}; // too old to call "live"
+}
 async function loadObs(stationsUrl,lat,lon){
   if(!stationsUrl) return null;
   const st=await getJSON(stationsUrl,{tries:2,timeout:12000});
-  for(const f of (st.features||[]).slice(0,4)){
+  const list=(st.features||[]).map(f=>{const [lo,la]=f.geometry?.coordinates||[];
+    return {id:f.properties.stationIdentifier,name:f.properties.name||f.properties.stationIdentifier,miles:la!=null?milesBetween(lat,lon,la,lo):999};})
+    .sort((a,b)=>a.miles-b.miles);
+  const airports=list.filter(x=>isAirport(x.id)).slice(0,4);
+  const C=q=>q&&q.value!=null?(/degC/.test(q.unitCode)?c2f(q.value):q.value):null;
+  const MPH=q=>q&&q.value!=null?(/km_h/.test(q.unitCode)?q.value*0.621371:/m_s/.test(q.unitCode)?q.value*2.23694:q.value):null;
+  // wind (and the main reading) from the nearest airport that reported recently
+  let air=null;
+  for(const a of airports){
     try{
-      const id=f.properties.stationIdentifier;
-      const o=(await getJSON(`https://api.weather.gov/stations/${id}/observations/latest`,{tries:1,timeout:10000})).properties;
-      if(o.temperature?.value==null) continue;
-      const t=Date.parse(o.timestamp); if(Date.now()-t>2.5*HOUR) continue; // too old to call "live"
-      const val=q=>q&&q.value!=null?q:null, C=q=>q?(/degC/.test(q.unitCode)?c2f(q.value):q.value):null;
-      const mph=q=>q?(/km_h/.test(q.unitCode)?q.value*0.621371:/m_s/.test(q.unitCode)?q.value*2.23694:q.value):null;
-      const [lo,la]=f.geometry?.coordinates||[];
-      const temp=C(val(o.temperature)), feels=C(val(o.heatIndex))??C(val(o.windChill))??temp, text=o.textDescription||'';
-      const precip=val(o.precipitationLastHour)?o.precipitationLastHour.value/25.4:null;
-      return {obs:true, t, station:f.properties.name||id, miles:la!=null?milesBetween(lat,lon,la,lo):null,
-        temp, feels, dew:C(val(o.dewpoint)), rh:val(o.relativeHumidity)?Math.round(o.relativeHumidity.value):null,
-        mph:val(o.windSpeed)?Math.round(mph(o.windSpeed)):null, dir:val(o.windDirection)?o.windDirection.value:null,
-        gust:val(o.windGust)?mph(o.windGust):null, short:text, qpf:precip,
-        vis:val(o.visibility)?o.visibility.value/1609.34:null, inHg:val(o.barometricPressure)?o.barometricPressure.value/3386.39:null,
-        pop:/rain|shower|drizzle|thunder|snow|sleet/i.test(text)?60:0};
+      const r=await latestObs(a.id); if(!r) continue;
+      let w=null;
+      if(r.o.windSpeed?.value!=null) w={mph:Math.round(MPH(r.o.windSpeed)),dir:r.o.windDirection?.value??null,gust:MPH(r.o.windGust),vrb:false};
+      const mw=metarWind(r.o.rawMessage);
+      if(!w||(w.dir==null&&mw&&mw.dir!=null)) w=mw||w; // fall back to the raw METAR wind group
+      if(!w) continue;
+      air={...a,...r,w}; break;
     }catch{}
   }
-  return null;
+  // temperature etc.: the airport report, or the nearest station of any kind if the airport left it blank
+  let base=air&&C(air.o.temperature)!=null?air:null;
+  if(!base) for(const s of list.slice(0,4)){ try{ const r=await latestObs(s.id); if(r&&C(r.o.temperature)!=null){base={...s,...r};break;} }catch{} }
+  if(!base&&!air) return null;
+  const o=(base||air).o, text=o.textDescription||'';
+  const temp=C(o.temperature), feels=C(o.heatIndex)??C(o.windChill)??temp;
+  const w=air?.w||(o.windSpeed?.value!=null?{mph:Math.round(MPH(o.windSpeed)),dir:o.windDirection?.value??null,gust:MPH(o.windGust)}:null);
+  return {obs:true, t:(base||air).t, station:(air||base).name, miles:(air||base).miles, stationId:(air||base).id,
+    windFrom:air?air.name:null, windMiles:air?air.miles:null,
+    tempFrom:base&&air&&base.id!==air.id?base.name:null,
+    temp, feels, dew:C(o.dewpoint), rh:o.relativeHumidity?.value!=null?Math.round(o.relativeHumidity.value):null,
+    mph:w?w.mph:null, dir:w?w.dir:null, gust:w?w.gust:null, vrb:!!w?.vrb, short:text,
+    qpf:o.precipitationLastHour?.value!=null?o.precipitationLastHour.value/25.4:null,
+    vis:o.visibility?.value!=null?o.visibility.value/1609.34:null, inHg:o.barometricPressure?.value!=null?o.barometricPressure.value/3386.39:null,
+    pop:/rain|shower|drizzle|thunder|snow|sleet/i.test(text)?60:0};
 }
 function isOver(g){
   const st=g.status||{};
@@ -1260,15 +1286,15 @@ function renderDetail(g,kind,venue,wx,orient){
   function renderLive(h,rel,box){
     const gust=h.gust&&h.gust>(h.mph||0)+4?rnd(h.gust):null;
     const row=(k,v)=>`<div><dt>${k}</dt><dd>${v??'–'}</dd></div>`;
-    const src=h.obs?`Observed ${fTime(h.t,tz)} at ${esc(h.station)}${h.miles!=null?` (${Math.round(h.miles)} mi away)`:''}. Updates every 5 minutes.`
+    const src=h.obs?`Observed ${fTime(h.t,tz)} at ${esc(h.station)}${h.miles!=null&&h.miles<999?` (${Math.round(h.miles)} mi away)`:''}${h.tempFrom?`, with temperature from ${esc(h.tempFrom)}`:''}.${h.windFrom?'':' No nearby airport reported wind.'} Updates every 5 minutes.`
       :'No recent station report, so this is the forecast for the current hour.';
     box.innerHTML=`<div class="g-top"><div><span class="g-when"><span class="livedot"></span>Live at the venue</span><p class="g-verdict">${esc(verdict(h))}</p></div></div>
       <div class="g-grid">
         <div class="g-cell g-temp"><span class="g-lbl">Temperature</span><div class="g-big">${rnd(h.temp)}°</div>
           <span class="g-sub"><b>${esc(h.short||'')}</b>${h.feels!=null&&Math.abs(h.feels-h.temp)>=1?`<br>Feels like ${rnd(h.feels)}°`:''}</span></div>
-        <div class="g-cell g-wind"><span class="g-lbl">Wind</span><div class="g-mid">${h.mph??'–'}<small>mph ${h.dir!=null?esc(deg2card(h.dir)):''}</small></div>
-          <span class="g-sub">${gust?`<b>Gusts to ${gust} mph.</b> `:''}${esc(rel)}</span></div>
-        <div class="g-cell g-rain"><span class="g-lbl">${h.obs?'Rain, last hour':'Rain chance'}</span><div class="g-mid">${h.obs?(h.qpf!=null?(h.qpf<0.005?'0':h.qpf.toFixed(2)):'–'):(h.pop??'–')}<small>${h.obs?'in':'%'}</small></div>
+        <div class="g-cell g-wind"><span class="g-lbl">Wind</span>${h.mph===0?`<div class="g-mid">Calm</div>`:`<div class="g-mid">${h.mph??'–'}<small>mph ${h.dir!=null?esc(deg2card(h.dir)):h.vrb?'variable':''}</small></div>`}
+          <span class="g-sub">${gust?`<b>Gusts to ${gust} mph.</b> `:''}${h.vrb&&h.mph>0?'Direction is shifting around. ':''}${esc(rel)}</span></div>
+        <div class="g-cell g-rain"><span class="g-lbl">${h.obs?'Rain, last hour':'Rain chance'}</span><div class="g-mid">${h.obs?(h.qpf??0).toFixed(2):(h.pop??'–')}<small>${h.obs?'in':'%'}</small></div>
           <span class="g-sub">${h.vis!=null?`Visibility ${h.vis>=9.5?'10+':Math.round(h.vis)} mi`:''}</span></div>
         <div class="g-cell"><span class="g-lbl">Comfort</span><dl class="g-list">
           ${row('Humidity',h.rh!=null?h.rh+'%':null)}${row('Dew point',h.dew!=null?rnd(h.dew)+'°':null)}${h.obs?row('Pressure',h.inHg!=null?h.inHg.toFixed(2)+' in':null):row('Sky cover',h.sky!=null?h.sky+'%':null)}</dl></div>
