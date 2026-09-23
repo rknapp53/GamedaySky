@@ -70,6 +70,8 @@ header.top{padding:40px 0 4px}
 .tm img{width:22px;height:22px;object-fit:contain;flex:none}
 .tm .rk{color:var(--faint);font-size:.78rem}
 .tm.sub{font-weight:400;color:var(--mute);font-size:.85rem}
+.rounds{display:flex;flex-wrap:wrap;gap:6px;margin:-8px 0 22px}.rounds .btn{text-decoration:none}.rounds .btn span{color:var(--faint);font-weight:400}
+.rounds .btn[aria-current="true"]{background:var(--text);color:#fff;border-color:var(--text)}.rounds .btn[aria-current="true"] span{color:rgba(255,255,255,.7)}
 .alm-win{min-width:190px}.alm-win span{display:block;color:var(--faint);font-size:.76rem}.alm-win b{font-weight:600;font-size:1.25rem;letter-spacing:-.02em}
 .ven{color:var(--mute);font-size:.85rem;min-width:0}
 .ven b{display:block;color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -185,7 +187,7 @@ button,.game,.hr,.chip,.day{touch-action:manipulation;-webkit-tap-highlight-colo
   header.top{padding-top:24px}
   .controls{margin:22px 0 14px}
   .chips{width:100%;display:flex;flex-wrap:wrap;border-radius:18px}
-  .chip{flex:1 1 22%}
+  .chip{flex:1 1 18%;padding-left:6px;padding-right:6px}
   #map{height:clamp(320px,56vh,460px);height:clamp(320px,56svh,460px)}
   .mapwrap{border-radius:18px}
   .compass{width:64px;height:64px;left:10px;top:10px}
@@ -208,7 +210,7 @@ section.blk{margin:48px 0 0}
 section.blk>h2{font-weight:600;font-size:1.45rem;letter-spacing:-.03em;margin:0 0 16px}
 .trends{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
 .trends li{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:16px 18px;color:var(--mute);font-size:.9rem;position:relative;box-shadow:var(--shadow)}
-.trends li b{display:block;font-weight:600;font-size:1rem;color:var(--text);margin-bottom:4px;letter-spacing:-.01em}
+.trends li b{display:block;padding-right:16px;font-weight:600;font-size:1rem;color:var(--text);margin-bottom:4px;letter-spacing:-.01em}
 .trends li::before{content:"";position:absolute;top:18px;right:18px;width:8px;height:8px;border-radius:50%;background:var(--faint)}
 .trends li.hot::before{background:var(--temp)} .trends li.wet::before{background:var(--rain)} .trends li.windy::before{background:var(--wind)}
 .chart{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:16px}
@@ -281,11 +283,11 @@ td.t{font-weight:600}
     <header class="top">
       <div class="brand">
         <h1>Gameday Sky</h1>
-        <p>Pick a game or race. Get the National Weather Service forecast for that stadium or track, hour by hour, with the wind drawn over it.</p>
+        <p>Pick a game, race or golf round. Get the National Weather Service forecast for that stadium or track, hour by hour, with the wind drawn over it.</p>
       </div>
       <div class="controls">
         <div class="chips" role="group" aria-label="Leagues" id="chips"></div>
-        <input class="search" id="search" type="search" placeholder="Filter by team, race or venue" aria-label="Filter by team, race or venue">
+        <input class="search" id="search" type="search" placeholder="Filter by team, event or venue" aria-label="Filter by team, event or venue">
       </div>
       <nav class="days" id="days" aria-label="Choose a date"></nav>
     </header>
@@ -310,8 +312,11 @@ const LEAGUES = {
   oreilly:{label:"O'Reilly", kind:'racing', series:2, espn:'racing/nascar-secondary', dur:2.5, full:"NASCAR O'Reilly Auto Parts Series (formerly Xfinity)"},
   truck:{label:'Trucks', kind:'racing', series:3, espn:'racing/nascar-truck', dur:2, full:'NASCAR Craftsman Truck Series'},
   arca:{label:'ARCA', kind:'racing', series:4, dur:1.75, full:'ARCA Menards Series'},
+  pga:{label:'PGA', path:'golf/pga', kind:'golf', full:'PGA Tour'},
+  lpga:{label:'LPGA', path:'golf/lpga', kind:'golf', full:'LPGA Tour'},
 };
-const startLabel=kind=>kind==='baseball'?'First pitch':kind==='racing'?'Green flag':'Kickoff';
+const startLabel=kind=>kind==='baseball'?'First pitch':kind==='racing'?'Green flag':kind==='golf'?'First tee':'Kickoff';
+const eventWord=kind=>kind==='racing'?'race':kind==='golf'?'round':'game';
 const ESPN = 'https://site.api.espn.com/apis/site/v2/sports/';
 /* MLB parks: home-team abbr -> location, approximate home-plate-to-center-field bearing, roof.
    OpenStreetMap field outlines are tried first; cf bearings here are a fallback. */
@@ -444,7 +449,7 @@ const ymd = d=>`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${Str
 
 /* ================= state ================= */
 const state = {
-  leagues:new Set(store.get('leagues2')||Object.keys(LEAGUES)),
+  leagues:new Set(store.get('leagues3')||Object.keys(LEAGUES)),
   day:0, query:'', games:[], byId:new Map(), errors:{}, loading:false, cache:new Map(), viewToken:0,
 };
 
@@ -468,6 +473,7 @@ function parseEvent(ev,league){
 }
 async function loadScoreboard(league,date){
   if(LEAGUES[league].kind==='racing') return loadRaces(league,date);
+  if(LEAGUES[league].kind==='golf') return loadGolf(league,date);
   const key=league+date; const hit=state.cache.get(key);
   if(hit && Date.now()-hit.at<5*60e3) return hit.games;
   const L=LEAGUES[league];
@@ -477,8 +483,13 @@ async function loadScoreboard(league,date){
   state.cache.set(key,{at:Date.now(),games});
   return games;
 }
-async function fetchGame(league,id){
+async function fetchGame(league,id,day){
   const L=LEAGUES[league];
+  if(L.kind==='golf'){
+    const d=day||ymd(new Date());
+    const g=(await loadGolf(league,d)).find(x=>x.id===String(id));
+    if(!g) throw new Error('tournament not found for that day'); return g;
+  }
   if(L.kind==='racing'){
     if(String(id).startsWith('e')) throw new Error('this race link came from a backup feed; pick the race from the list');
     const y=new Date().getFullYear();
@@ -492,6 +503,43 @@ async function fetchGame(league,id){
   return {id:String(id), league, date:c.date, status:c.status?.type||{}, home:team(home), away:team(away), neutral:!!c.neutralSite,
     venue:{id:v.id, name:v.fullName||'', city:v.address?.city||'', state:v.address?.state||'', indoor:!!v.indoor},
     tv:(c.broadcasts||[]).map(b=>b.media?.shortName).filter(Boolean).join(', ')};
+}
+
+/* ================= Golf (PGA Tour, LPGA Tour) ================= */
+const ymdOf=s=>String(s||'').slice(0,10).replace(/-/g,'');
+function ymdAdd(d,n){const t=new Date(Date.UTC(+d.slice(0,4),+d.slice(4,6)-1,+d.slice(6,8)+n));return t.toISOString().slice(0,10).replace(/-/g,'');}
+function zoned(d,hour,tz){ // wall-clock hour on day d (YYYYMMDD) in tz -> epoch ms
+  const guess=Date.UTC(+d.slice(0,4),+d.slice(4,6)-1,+d.slice(6,8),hour);
+  const p=new Intl.DateTimeFormat('en-US',{timeZone:tz,hourCycle:'h23',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).formatToParts(new Date(guess));
+  const g=k=>+p.find(x=>x.type===k).value;
+  return guess-(Date.UTC(g('year'),g('month')-1,g('day'),g('hour'),g('minute'))-guess);
+}
+const dayName=(d,o)=>new Date(+d.slice(0,4),+d.slice(4,6)-1,+d.slice(6,8)).toLocaleDateString('en-US',o);
+function golfDays(g){const out=[];let d=g.startYmd;while(d<=g.endYmd&&out.length<4){out.push(d);d=ymdAdd(d,1);}return out;}
+function parseGolf(ev,league){
+  const c=ev.competitions?.[0]||{};
+  const courses=ev.courses||c.courses||[];
+  const co=courses.find(x=>x.host)||courses[0]||c.venue||ev.venue||{};
+  const addr=co.address||{};
+  const startYmd=ymdOf(ev.date||c.date);
+  let endYmd=ymdOf(ev.endDate||c.endDate)||ymdAdd(startYmd,3);
+  if(endYmd<startYmd) endYmd=startYmd;
+  return {id:String(ev.id), league, golf:true, startYmd, endYmd, status:(c.status||ev.status||{}).type||{},
+    home:{name:ev.name||'Tournament',short:ev.shortName||ev.name||'Tournament',abbr:'',logo:''}, away:null,
+    venue:{id:'golf'+(co.id||ev.id),name:co.name||co.fullName||'',city:addr.city||'',state:addr.state||'',indoor:false}, neutral:false, tv:''};
+}
+function golfDay(g,date){
+  const days=golfDays(g), i=days.indexOf(date);
+  return {...g, day:date, round:i+1, rounds:days.length, date:`${date.slice(0,4)}-${date.slice(4,6)}-${date.slice(6,8)}T11:00:00Z`};
+}
+async function loadGolf(league,date){
+  const key=league+date, hit=state.cache.get(key);
+  if(hit&&Date.now()-hit.at<5*60e3) return hit.games;
+  const L=LEAGUES[league];
+  const j=await getJSON(`${ESPN}${L.path}/scoreboard?dates=${ymdAdd(date,-4)}-${date}`);
+  const games=(j.events||[]).map(ev=>parseGolf(ev,league))
+    .filter(g=>g.startYmd<=date&&date<=g.endYmd&&golfDays(g).includes(date)).map(g=>golfDay(g,date));
+  state.cache.set(key,{at:Date.now(),games}); return games;
 }
 
 /* ================= NASCAR (Cup, O'Reilly/Xfinity, Trucks, ARCA) ================= */
@@ -592,12 +640,12 @@ async function loadDay(){
   state.games=[];
   results.forEach((r,i)=>{ if(r.status==='fulfilled') state.games.push(...r.value); else state.errors[want[i]]=r.reason?.message||'request failed'; });
   const seen=new Set();
-  state.games=state.games.filter(g=>{const k=g.league+g.id; if(seen.has(k)) return false; seen.add(k); state.byId.set(g.league+':'+g.id,g); return true;});
+  state.games=state.games.filter(g=>{const k=g.league+':'+g.id+(g.day?':'+g.day:''); if(seen.has(k)) return false; seen.add(k); state.byId.set(k,g); return true;});
   state.games.sort((a,b)=>Date.parse(a.date)-Date.parse(b.date)||a.league.localeCompare(b.league));
   state.loading=false; renderList();
 }
 function roofTag(g){
-  if(g.racing) return '';
+  if(g.racing||g.golf) return '';
   const L=LEAGUES[g.league];
   const t=L.kind==='baseball'?MLB[g.home.abbr]:g.league==='nfl'?NFL[g.home.abbr]:null;
   const roof=(t&&!g.neutral)?t.roof:(g.venue.indoor?'dome':'open');
@@ -613,12 +661,21 @@ function renderList(){
   if(!state.leagues.size){box.innerHTML='<p class="empty">Turn on at least one league above to see games.</p>';return;}
   if(!games.length){box.innerHTML=errs+`<p class="empty">${q?'No games match that filter on this date.':'No games on this date for the leagues you picked. Try another day, or turn another league on.'}</p>`;return;}
   const slots=new Map();
-  for(const g of games){const k=new Date(g.date).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); if(!slots.has(k)) slots.set(k,[]); slots.get(k).push(g);}
+  for(const g of games){const k=g.golf?'Golf, all day':new Date(g.date).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); if(!slots.has(k)) slots.set(k,[]); slots.get(k).push(g);}
   box.innerHTML=errs+[...slots].map(([time,gs])=>`<div class="slot"><h2>${time}</h2>${gs.map(gameRow).join('')}</div>`).join('');
 }
 function gameRow(g){
   const st=g.status||{}; const roof=roofTag(g);
   const stTag=st.state==='in'?`<span class="tag live">Live</span>`:st.state==='post'?`<span class="tag">${esc(st.shortDetail||'Final')}</span>`:'';
+  if(g.golf){
+    const L=LEAGUES[g.league], today=ymd(new Date());
+    const gt=g.day<today?'<span class="tag">Round complete</span>':g.day===today&&st.state==='in'?'<span class="tag live">Live</span>':'';
+    return `<button class="game" data-go="${g.league}/${esc(g.id)}/${g.day}">
+    <span class="lg">${esc(L.label)}</span>
+    <span class="teams"><span class="tm">${esc(g.home.name)}</span><span class="tm sub">${esc(L.full)}, round ${g.round} of ${g.rounds}</span></span>
+    <span class="ven"><b>${esc(g.venue.name||'Course TBA')}</b>${esc([g.venue.city,g.venue.state].filter(Boolean).join(', '))}</span>
+    <span class="tags">${gt}</span></button>`;
+  }
   if(g.racing){
     const r=g.race, L=LEAGUES[g.league];
     return `<button class="game" data-go="${g.league}/${esc(g.id)}">
@@ -825,6 +882,13 @@ function relWind(kind,field,dirFrom,mph){
   if(mph==null||dirFrom==null) return '';
   if(mph<3) return 'Light and variable. Little effect on play.';
   const to=norm360(dirFrom+180);
+  if(kind==='golf'){
+    const w=deg2word(dirFrom);
+    if(mph<8) return 'Light winds. Good scoring conditions.';
+    if(mph<15) return `Steady breeze from the ${w}. Expect players to club up into it on some holes.`;
+    if(mph<22) return `Windy from the ${w}. Scores should climb, especially on exposed holes.`;
+    return `Very windy from the ${w}. Tough scoring, and play can be suspended if balls start moving on the greens.`;
+  }
   if(kind==='road') return `Road course, so the wind turns from headwind to tailwind corner to corner.${mph>=15?' Braking points shift with it.':''}`;
   if(kind==='racing'){
     if(field==null) return `Wind from the ${deg2word(dirFrom)}.`;
@@ -922,6 +986,13 @@ function teardown(){ if(detail){detail.wind?.stop(); detail.map?.remove(); detai
 
 function heroHTML(g,tz){
   const L=LEAGUES[g.league], t=Date.parse(g.date);
+  if(g.golf){
+    const days=golfDays(g);
+    return `<div class="hero"><span class="side"><h1>${esc(g.home.name)}</h1></span></div>
+  <p class="meta"><span id="whereline"><strong>${esc(g.venue.name||'Course TBA')}</strong> ${esc([g.venue.city,g.venue.state].filter(Boolean).join(', '))}</span>
+  <span id="whenline">Round ${g.round}, ${esc(dayName(g.day,{weekday:'long',month:'short',day:'numeric'}))}</span><span>${esc(L.full)}</span></p>
+  <nav class="rounds" aria-label="Rounds">${days.map((d,i)=>`<a class="btn" href="#/g/${g.league}/${esc(g.id)}/${d}" aria-current="${d===g.day}">Round ${i+1} <span>${esc(dayName(d,{weekday:'short'}))}</span></a>`).join('')}</nav>`;
+  }
   if(g.racing){
     const when=new Date(t).toLocaleString('en-US',{weekday:'long',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
     return `<div class="hero"><span class="side"><h1>${esc(g.race.name)}</h1></span></div>
@@ -935,20 +1006,21 @@ function heroHTML(g,tz){
   <span id="whenline">${startLabel(L.kind)} ${esc(when)}</span><span>${L.label}${g.tv?`, ${esc(g.tv)}`:''}</span></p>`;
 }
 
-async function showGame(league,id){
+async function showGame(league,id,day){
   if(!$('#list-view').hidden) state.listY=scrollY;
   const token=++state.viewToken; teardown();
   $('#list-view').hidden=true; $('#detail-view').hidden=false; window.scrollTo(0,0);
-  const root=$('#detail'); root.innerHTML='<p class="status">Loading the game…</p>';
-  let g=state.byId.get(league+':'+id);
-  try{ if(!g){g=await fetchGame(league,id); state.byId.set(league+':'+id,g);} }
-  catch(e){ root.innerHTML=`<p class="status err">Couldn't load this game from ESPN (${esc(e.message)}). Go back and pick it again from the list.</p>`; return; }
+  const root=$('#detail'); root.innerHTML='<p class="status">Loading…</p>';
+  const bk=league+':'+id+(day?':'+day:'');
+  let g=state.byId.get(bk);
+  try{ if(!g){g=await fetchGame(league,id,day); state.byId.set(bk,g);} }
+  catch(e){ root.innerHTML=`<p class="status err">Couldn't load this event (${esc(e.message)}). Go back and pick it again from the list.</p>`; return; }
   if(token!==state.viewToken) return;
   const kind=LEAGUES[league].kind;
-  root.innerHTML=heroHTML(g)+'<p class="status" id="dstatus">Finding the stadium…</p><div id="dbody"></div>';
+  root.innerHTML=heroHTML(g)+'<p class="status" id="dstatus">Finding the venue…</p><div id="dbody"></div>';
   let venue;
   try{ venue=await resolveVenue(g); }catch(e){ $('#dstatus').className='status err'; $('#dstatus').textContent=e.message; return; }
-  if(g.racing&&!g.venue.city&&venue.city){ g.venue.city=venue.city; g.venue.state=venue.state;
+  if((g.racing||g.golf)&&!g.venue.city&&venue.city){ g.venue.city=venue.city; g.venue.state=venue.state;
     const wl=$('#whereline'); if(wl) wl.innerHTML=`<strong>${esc(g.venue.name)}</strong> ${esc([venue.city,venue.state].filter(Boolean).join(', '))}`; }
   if(token!==state.viewToken) return;
   $('#dstatus').textContent='Pulling the National Weather Service forecast…';
@@ -957,7 +1029,8 @@ async function showGame(league,id){
     fieldOrientation(kind,venue.lat,venue.lon).catch(()=>null),
     pickStyle()]);
   if(token!==state.viewToken) return;
-  if(wx.tz) $('#whenline').textContent=
+  if(g.golf) g.golfStart=zoned(g.day,7,wx.tz||Intl.DateTimeFormat().resolvedOptions().timeZone);
+  if(wx.tz&&!g.golf) $('#whenline').textContent=
     `${startLabel(kind)} ${fDay(Date.parse(g.date),wx.tz)}, ${fTime(Date.parse(g.date),wx.tz)} local`;
   $('#dstatus').remove();
   renderDetail(g,kind,venue,wx,orient);
@@ -965,10 +1038,10 @@ async function showGame(league,id){
 
 function renderDetail(g,kind,venue,wx,orient){
   const body=$('#dbody'); const tz=wx.tz||Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const t0=Date.parse(g.date), dur=(kind==='baseball'?3:kind==='racing'?LEAGUES[g.league].dur:3.5)*HOUR, now=Date.now();
+  const t0=g.golfStart??Date.parse(g.date), dur=(kind==='baseball'?3:kind==='racing'?LEAGUES[g.league].dur:kind==='golf'?11:3.5)*HOUR, now=Date.now();
   const startWord=startLabel(kind).toLowerCase();
   const rk=kind==='racing'&&isRoad(g)?'road':kind;
-  const inWord=kind==='racing'?'In race':'In game';
+  const inWord=kind==='racing'?'In race':kind==='golf'?'In play':'In game';
 
   /* field placement */
   let field;
@@ -996,7 +1069,7 @@ function renderDetail(g,kind,venue,wx,orient){
     msg=wx.error.outside?`The National Weather Service only forecasts for the United States and its territories, and this venue is outside that area. The map below still shows the venue.`
       :`The National Weather Service didn't answer (${esc(wx.error.message)}). Their API has brief outages; reload in a minute to try again.`;
   }else if(over){
-    msg=`This game has ended. Showing the current forecast at the stadium instead.`;
+    msg=`This ${eventWord(kind)} has ended. Showing the current forecast at the venue instead.`;
   }else if(!covered){
     msg=hours.length?`Hourly detail isn't out yet. The NWS publishes hourly forecasts about 6 to 7 days ahead, so check back closer to ${startWord}.${period?' The day forecast below covers game time.':''}`
       :`The hourly forecast didn't load${wx.hourlyErr?` (${esc(wx.hourlyErr.message)})`:''}. Reload to try again.`;
@@ -1006,7 +1079,7 @@ function renderDetail(g,kind,venue,wx,orient){
   body.innerHTML=`${alerts}${msg?`<p class="status err">${msg}</p>`:''}
   <section class="glance" aria-label="Game-time conditions"><div id="now" aria-live="polite"></div>
       ${scrub.length?`<div class="scrub" id="scrub" role="group" aria-label="Choose an hour">${scrub.map(h=>{
-        const i=hours.indexOf(h); const rel=h.t<floorHour(anchorT)?(kind==='racing'?'Pre-race':'Pregame'):h.t===floorHour(anchorT)?(over?'Now':startLabel(kind)):inWord;
+        const i=hours.indexOf(h); const rel=h.t<floorHour(anchorT)?(kind==='racing'?'Pre-race':kind==='golf'?'Early':'Pregame'):h.t===floorHour(anchorT)?(over?'Now':startLabel(kind)):inWord;
         return `<button class="hr ${i===kickIdx?'kick':''}" data-i="${i}" aria-pressed="${i===kickIdx}"><small>${rel}</small><b>${fHour(h.t,tz)}</b></button>`;}).join('')}</div>`:''}
   </section>
   ${roofMsg?`<p class="roofnote">${roofMsg}</p>`:''}
@@ -1023,7 +1096,7 @@ function renderDetail(g,kind,venue,wx,orient){
   ${covered?`<section class="blk"><h2>The rundown</h2><ul class="trends" id="trends"></ul></section>
   <section class="blk"><h2>Hour by hour</h2><div class="chart" id="chart"></div>
     <div class="tablewrap"><table id="htable"></table></div></section>`:''}
-  <section class="blk"><h2>The almanac</h2><div id="almanac"><p class="alm-loading">${kind==='racing'?'Looking up the last race at this track, and the weather that day…':'Looking up the last time these two met, and the weather that day…'}</p></div></section>
+  <section class="blk"><h2>The almanac</h2><div id="almanac"><p class="alm-loading">${kind==='golf'?'Looking up the weather at this course on the same day last year…':kind==='racing'?'Looking up the last race at this track, and the weather that day…':'Looking up the last time these two met, and the weather that day…'}</p></div></section>
   ${(wx.periods||[]).length?`<section class="blk"><h2>From the forecaster</h2><div class="nwstext" id="nwstext"></div></section>`:''}
   <p class="fine">Forecast: National Weather Service (api.weather.gov)${wx.updated?`, updated ${esc(fTime(Date.parse(wx.updated),tz))} ${esc(fmt(Date.parse(wx.updated),tz,{month:'short',day:'numeric'}))}`:''}.
   Schedules and past results: ESPN and NASCAR. Past-game weather: Open-Meteo historical data (reanalysis estimates for the venue location). Map: OpenFreeMap and OpenStreetMap contributors; satellite imagery by Esri. Wind descriptions use field orientation from OpenStreetMap when available and are approximate. Times on this page are in the venue's local time (${esc(tz)}).</p>`;
@@ -1032,7 +1105,7 @@ function renderDetail(g,kind,venue,wx,orient){
   const fieldCenter=kind==='baseball'?dest(field.anchor[0],field.anchor[1],fb(),60):field.anchor;
   const camBearing=()=>0; // north at the top, looking north to south
   const tl=g.race?.trackLen, rz=isRoad(g)?14.4:tl==null?15.2:tl>=2?14.3:tl>=1.3?14.9:tl>=0.8?15.4:15.9;
-  const zoom=kind==='racing'?rz:16.35;
+  const zoom=kind==='racing'?rz:kind==='golf'?15:16.35;
   if(!window.maplibregl){ // map library blocked or offline: show a note and use a do-nothing stand-in
     $('#map').outerHTML='<p class="status" id="map" style="padding:40px 20px;margin:0">The 3D map couldn\'t load on this connection. The forecast below is complete.</p>';
     const div=()=>document.createElement('div');
@@ -1136,18 +1209,28 @@ function renderDetail(g,kind,venue,wx,orient){
     const items=[];
     const dT=rnd(last.temp)-rnd(k.temp);
     items.push({c:k.temp>=85?'hot':'',b:`${rnd(k.temp)}° at ${over?'the start':startWord}`,
-      p:Math.abs(dT)<3?`Holding steady near ${rnd(k.temp)}° through the ${kind==='racing'?'race':'game'}.`:`${dT<0?'Cooling':'Warming'} to ${rnd(last.temp)}° by ${fHour(last.t,tz)}${kind==='baseball'?', around the late innings':kind==='racing'?', near the checkered flag':', around the fourth quarter'}.`});
+      p:Math.abs(dT)<3?`Holding steady near ${rnd(k.temp)}° through the ${eventWord(kind)}.`:`${dT<0?'Cooling':'Warming'} to ${rnd(last.temp)}° by ${fHour(last.t,tz)}${kind==='baseball'?', around the late innings':kind==='racing'?', near the checkered flag':kind==='golf'?', late in the round':', around the fourth quarter'}.`});
     const mp=win.reduce((a,h)=>h.pop>a.pop?h:a,win[0]||k);
     const qTot=win.reduce((s,h)=>s+(h.qpf||0),0);
     items.push({c:mp.pop>=40?'wet':'',b:mp.pop>=20?`Rain chance up to ${mp.pop}%`:'Rain looks unlikely',
-      p:mp.pop>=20?`Highest around ${fHour(mp.t,tz)}${qTot>=0.01?`, with about ${qTot.toFixed(2)} in expected over the ${kind==='racing'?'race':'game'}`:''}.${kind==='baseball'&&mp.pop>=50&&venue.roof==='open'?' A rain delay is possible.':''}${kind==='racing'&&mp.pop>=40?(rk==='road'?' Road courses can race in the wet, on rain tires.':' Ovals can\'t race on a wet track, so a delay or shortened race is possible.'):''}`:`No hour tops a ${Math.max(...win.map(h=>h.pop||0))}% chance during the ${kind==='racing'?'race':'game'}.`});
+      p:mp.pop>=20?`Highest around ${fHour(mp.t,tz)}${qTot>=0.01?`, with about ${qTot.toFixed(2)} in expected over the ${eventWord(kind)}`:''}.${kind==='baseball'&&mp.pop>=50&&venue.roof==='open'?' A rain delay is possible.':''}${kind==='golf'&&mp.pop>=40?' Lightning nearby would suspend play.':''}${kind==='racing'&&mp.pop>=40?(rk==='road'?' Road courses can race in the wet, on rain tires.':' Ovals can\'t race on a wet track, so a delay or shortened race is possible.'):''}`:`No hour tops a ${Math.max(...win.map(h=>h.pop||0))}% chance during the ${eventWord(kind)}.`});
     const mg=win.reduce((a,h)=>(h.gust||h.mph||0)>(a.gust||a.mph||0)?h:a,win[0]||k);
     const peak=rnd(mg.gust||mg.mph);
     items.push({c:peak>=20?'windy':'',b:`Wind ${k.mph} mph from the ${deg2word(k.dir)}`,
       p:`${peak>k.mph+4?`Gusts up to ${peak} mph around ${fHour(mg.t,tz)}. `:''}${relWind(rk,fb(),k.dir,k.mph)}`});
     if(k.dew!=null){const dp=rnd(k.dew); items.push({c:dp>=68?'hot':'',b:dp>=65?'Muggy':dp>=55?'Comfortable humidity':'Dry air',
       p:`Dew point ${dp}°, humidity ${k.rh}%.${k.feels!=null&&Math.abs(k.feels-k.temp)>=4?` Feels like ${rnd(k.feels)}°.`:''}`});}
-    if(pre.length&&!over){const lo=Math.min(...pre.map(h=>h.temp)),hi=Math.max(...pre.map(h=>h.temp)),pp=Math.max(...pre.map(h=>h.pop||0));
+    if(kind==='golf'){
+      const hr=h=>+fmt(h.t,tz,{hour:'numeric',hourCycle:'h23'});
+      const am=win.filter(h=>hr(h)<12), pm=win.filter(h=>hr(h)>=12);
+      if(am.length&&pm.length){
+        const avg=a=>Math.round(a.reduce((s,h)=>s+(h.mph||0),0)/a.length), mx=a=>Math.max(...a.map(h=>h.pop||0));
+        const dw=avg(pm)-avg(am), dp=mx(pm)-mx(am);
+        items.push({c:Math.abs(dw)>=4?'windy':'',b:'Morning vs. afternoon wave',
+          p:`Wind averages ${avg(am)} mph in the morning and ${avg(pm)} mph in the afternoon. ${dw>=4?'The afternoon wave gets the tougher conditions.':dw<=-4?'The morning wave gets the tougher conditions.':'Both waves should see similar conditions.'}${Math.abs(dp)>=20?` Rain chances are higher in the ${dp>0?'afternoon':'morning'}.`:''}`});
+      }
+    }
+    if(pre.length&&!over&&kind!=='golf'){const lo=Math.min(...pre.map(h=>h.temp)),hi=Math.max(...pre.map(h=>h.temp)),pp=Math.max(...pre.map(h=>h.pop||0));
       items.push({c:pp>=40?'wet':'',b:kind==='football'?'Tailgate window':kind==='racing'?'Pre-race':'Before the game',p:`${fHour(pre[0].t,tz)} to ${fHour(k.t,tz)}: ${rnd(lo)===rnd(hi)?rnd(hi)+'°':`${rnd(lo)}° to ${rnd(hi)}°`}, rain chance up to ${pp}%.`});}
     $('#trends').innerHTML=items.map(i=>`<li class="${i.c}"><b>${esc(i.b)}</b>${esc(i.p)}</li>`).join('');
   }
@@ -1158,7 +1241,7 @@ function renderDetail(g,kind,venue,wx,orient){
   }
   function drawChart(avail){
     const narrow=avail<600;
-    const H0=floorHour(anchorT)-(narrow?3:5)*HOUR, H1=anchorT+dur+(narrow?3:6)*HOUR;
+    const H0=floorHour(anchorT)-2*HOUR, H1=anchorT+dur+1*HOUR;
     const hs=hours.filter(h=>h.t>=H0&&h.t<=H1); if(hs.length<3){$('#chart').innerHTML='';return;}
     const W=Math.max(280,Math.round(avail||900)),Ht=narrow?260:300,pl=narrow?34:42,pr=narrow?16:14,pt=18,plotB=Ht-100;
     const colW=(W-pl-pr)/hs.length, lblEvery=Math.max(1,Math.ceil(52/colW)), tEvery=Math.max(2,Math.ceil(40/colW)), wEvery=Math.max(1,Math.ceil(24/colW));
@@ -1178,7 +1261,7 @@ function renderDetail(g,kind,venue,wx,orient){
     const pts=hs.filter((h,i)=>i%tEvery===0).map(h=>`<text x="${x(h.t)}" y="${y(h.temp)-9}" text-anchor="middle" fill="#D98200" font-size="12" font-weight="700">${rnd(h.temp)}°</text>`).join('');
     $('#chart').innerHTML=`<svg viewBox="0 0 ${W} ${Ht}" role="img" aria-label="Temperature, feels-like temperature, rain chance and wind by hour">
       <rect x="${gx0}" y="${pt}" width="${Math.max(0,gx1-gx0)}" height="${plotB-pt}" fill="#0A7CC4" opacity=".06" rx="8"/>
-      <text x="${gx0+6}" y="${pt+14}" fill="#0A7CC4" font-size="12" font-weight="500">${over?'Now':kind==='racing'?'Race time':'Game time'}</text>
+      <text x="${gx0+6}" y="${pt+14}" fill="#0A7CC4" font-size="12" font-weight="500">${over?'Now':kind==='racing'?'Race time':kind==='golf'?'Round time':'Game time'}</text>
       ${grid}${bars}
       <path d="${path('feels')}" fill="none" stroke="#DC3F44" stroke-width="2" stroke-dasharray="5 5"/>
       <path d="${path('temp')}" fill="none" stroke="#D98200" stroke-width="3" stroke-linejoin="round"/>
@@ -1188,7 +1271,7 @@ function renderDetail(g,kind,venue,wx,orient){
     </svg><div class="legend"><span><i style="background:#D98200"></i>Temperature</span><span><i style="background:repeating-linear-gradient(90deg,#DC3F44 0 5px,transparent 5px 9px)"></i>Feels like</span><span><i style="background:#6D7BF0;height:10px;width:10px;opacity:.7"></i>Rain chance</span><span>Arrows point where the wind is blowing</span></div>`;
   }
   function renderTable(){
-    const rows=hours.map((h,i)=>({h,i})).filter(({h})=>h.t>=floorHour(anchorT)-3*HOUR&&h.t<=anchorT+dur+2*HOUR);
+    const rows=hours.map((h,i)=>({h,i})).filter(({h})=>h.t>=floorHour(anchorT)-2*HOUR&&h.t<=anchorT+dur+1*HOUR);
     $('#htable').innerHTML=`<thead><tr><th>Time</th><th>Sky</th><th>Temp</th><th>Feels</th><th>Wind</th><th>Gusts</th><th>Humidity</th><th>Dew pt</th><th>Rain chance</th><th>Rain</th></tr></thead><tbody>${
       rows.map(({h,i})=>`<tr data-i="${i}" class="${h.t>=floorHour(anchorT)&&h.t<=anchorT+dur?'game-hr':''}">
         <td class="t">${fHour(h.t,tz)}</td><td>${esc(h.short||'')}</td><td class="t">${rnd(h.temp)}°</td><td>${h.feels!=null?rnd(h.feels)+'°':'–'}</td>
@@ -1282,11 +1365,12 @@ function almSpark(w,tz,W=640){
 }
 async function loadAlmanac(g,kind,now,token){
   const box=$('#almanac'); if(!box) return;
-  const dur=(kind==='baseball'?3:kind==='racing'?LEAGUES[g.league].dur:3.5)*HOUR;
-  const racing=!!g.racing;
+  const dur=(kind==='baseball'?3:kind==='racing'?LEAGUES[g.league].dur:kind==='golf'?11:3.5)*HOUR;
+  const racing=!!g.racing, golf=!!g.golf;
   let items=[], span=0;
   try{
-    if(racing) items=await findPastRaces(g);
+    if(golf) items=[{date:new Date((g.golfStart??Date.parse(g.date))-364*86400e3).toISOString(),venue:g.venue}];
+    else if(racing) items=await findPastRaces(g);
     else { const res=await findMeetings(g); items=res.list; span=res.span; }
   }catch(e){ if(token===state.viewToken) box.innerHTML=`<p class="alm-empty">Couldn't load past schedules (${esc(e.message)}).</p>`; return; }
   if(token!==state.viewToken) return;
@@ -1297,7 +1381,7 @@ async function loadAlmanac(g,kind,now,token){
   }
   const withWx=await Promise.all(items.map(async m=>{
     try{
-      const v=racing?await resolveVenue(g):await resolveVenue({league:g.league,home:{abbr:m.home.abbr},venue:m.venue,neutral:m.neutral});
+      const v=racing||golf?await resolveVenue(g):await resolveVenue({league:g.league,home:{abbr:m.home.abbr},venue:m.venue,neutral:m.neutral});
       const [w,winner]=await Promise.all([pastWeather(v.lat,v.lon,Date.parse(m.date),dur),racing?raceWinner(m):null]);
       return {m,v,w,winner};
     }catch{return {m,v:null,w:null,winner:null};}
@@ -1312,21 +1396,21 @@ async function loadAlmanac(g,kind,now,token){
   const dateStr=x=>fmt(Date.parse(x.m.date),tzOf(x),{weekday:'short',month:'long',day:'numeric',year:'numeric'});
   const indoor=x=>!racing&&x.v&&(x.v.roof==='dome'||x.v.roof==='retractable'||x.m.venue.indoor);
   const ago=ms=>{const d=Math.round((Date.now()-ms)/86400e3); return d<60?`${d} days ago`:d<730?`${Math.round(d/30.4)} months ago`:`${Math.round(d/365.25)} years ago`;};
-  const startAt=kind==='baseball'?'first pitch':kind==='racing'?'the green flag':'kickoff';
+  const startAt=kind==='baseball'?'first pitch':kind==='racing'?'the green flag':kind==='golf'?'7 AM':'kickoff';
   const f=first, w=f.w, k=w?.kick;
   let compare='';
   if(k&&now&&now.temp!=null){
     const dT=Math.round(now.temp-k.temp), dW=Math.round((now.mph||0)-(k.mph||0));
     const parts=[Math.abs(dT)<3?'about the same temperature':`${Math.abs(dT)}° ${dT>0?'warmer':'colder'}`];
     if(Math.abs(dW)>=5) parts.push(`${dW>0?'windier':'calmer'} by ${Math.abs(dW)} mph`);
-    compare=`<p class="alm-compare">Compared with that day, this ${racing?'race':'game'}'s forecast is ${parts.join(' and ')}.</p>`;
+    compare=`<p class="alm-compare">Compared with that day, this ${eventWord(kind)}'s forecast is ${parts.join(' and ')}.</p>`;
   }
-  const right=racing?(f.winner?`<div class="alm-win"><span>Winner</span><b>${esc(f.winner)}</b></div>`:''):score(f.m);
-  const where=racing?`${esc(f.m.race.name)}, ${esc(f.m.venue.name)}`
+  const right=golf?'':racing?(f.winner?`<div class="alm-win"><span>Winner</span><b>${esc(f.winner)}</b></div>`:''):score(f.m);
+  const where=golf?`${esc(g.venue.name)}`:racing?`${esc(f.m.race.name)}, ${esc(f.m.venue.name)}`
     :`${esc(f.m.venue.name)}${f.m.venue.city?`, ${esc(f.m.venue.city)}${f.m.venue.state?`, ${esc(f.m.venue.state)}`:''}`:''}`;
   const feature=`<article class="alm-card">
     <header class="alm-head">
-      <div><span class="alm-kicker">${racing?'Last race here':'Last meeting'}, ${esc(ago(Date.parse(f.m.date)))}</span>
+      <div><span class="alm-kicker">${golf?'Same day last year at this course':`${racing?'Last race here':'Last meeting'}, ${esc(ago(Date.parse(f.m.date)))}`}</span>
         <h3>${esc(dateStr(f))}</h3><span class="alm-where">${where}</span></div>
       ${right}
     </header>
@@ -1337,14 +1421,14 @@ async function loadAlmanac(g,kind,now,token){
         <div><dt>Wind</dt><dd>${rnd(k.mph)} mph ${esc(deg2card(k.dir))}</dd></div>
         <div><dt>Peak gust</dt><dd>${rnd(w.maxGust)} mph</dd></div>
         <div><dt>Humidity</dt><dd>${rnd(k.rh)}%</dd></div>
-        <div><dt>${racing?'Race range':'Game range'}</dt><dd>${rnd(w.lo)}° to ${rnd(w.hi)}°</dd></div>
+        <div><dt>${racing?'Race range':golf?'Day range':'Game range'}</dt><dd>${rnd(w.lo)}° to ${rnd(w.hi)}°</dd></div>
         <div><dt>Precip</dt><dd>${w.precip<0.005?'None':w.precip.toFixed(2)+' in'}</dd></div>
         <div><dt>Worst sky</dt><dd>${esc(WMO[w.worst.code]||'–')}</dd></div>
       </dl>
       <div class="alm-spark" id="almspark"></div>
       ${indoor(f)?`<p class="alm-note">Played at a covered stadium. These are the outdoor conditions that day.</p>`:''}
       ${compare}
-    </div>`:`<p class="alm-empty">Couldn't reconstruct the weather for this ${racing?'race':'game'}.</p>`}
+    </div>`:`<p class="alm-empty">Couldn't reconstruct the weather for this ${golf?'day':eventWord(kind)}.</p>`}
   </article>`;
   const more=rest.length?`<div class="alm-more"><h4>${racing?'Earlier races here':'Earlier meetings'}</h4>${rest.map(x=>`<div class="alm-row">
       <span class="alm-rdate">${esc(fmt(Date.parse(x.m.date),tzOf(x),{month:'short',day:'numeric',year:'numeric'}))}</span>
@@ -1362,13 +1446,13 @@ async function loadAlmanac(g,kind,now,token){
 
 /* ================= routing + events ================= */
 function route(){
-  const m=location.hash.match(new RegExp(`^#/g/(${Object.keys(LEAGUES).join('|')})/([\\w-]+)$`));
-  if(m) showGame(m[1],m[2]);
+  const m=location.hash.match(new RegExp(`^#/g/(${Object.keys(LEAGUES).join('|')})/([\\w-]+)(?:/(\\d{8}))?$`));
+  if(m) showGame(m[1],m[2],m[3]);
   else{ state.viewToken++; teardown(); $('#detail-view').hidden=true; $('#list-view').hidden=false; if(!state.games.length&&!state.loading) loadDay(); else requestAnimationFrame(()=>scrollTo(0,state.listY||0)); }
 }
 $('#chips').addEventListener('click',e=>{
   const b=e.target.closest('.chip'); if(!b) return; const k=b.dataset.lg;
-  state.leagues.has(k)?state.leagues.delete(k):state.leagues.add(k); store.set('leagues2',[...state.leagues]); renderChips();
+  state.leagues.has(k)?state.leagues.delete(k):state.leagues.add(k); store.set('leagues3',[...state.leagues]); renderChips();
   const date=ymd(dayDate(state.day));
   if(state.leagues.has(k)&&!state.cache.has(k+date)) loadDay(); else renderList();
 });
