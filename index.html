@@ -40,6 +40,32 @@ header.top{padding:40px 0 4px}
 .brand h1{font-weight:600;font-size:clamp(2rem,4.6vw,3rem);line-height:1;letter-spacing:-.035em;margin:0}
 .brand p{margin:0;color:var(--mute);max-width:44ch;font-size:.95rem}
 .controls{display:flex;flex-wrap:wrap;gap:14px 18px;align-items:flex-end;margin:32px 0 18px}
+/* list / map switch */
+.viewbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:0 0 14px}
+.viewbar .note{margin:0}
+.viewtabs{display:inline-flex;gap:2px;padding:3px;border-radius:12px;background:var(--bg-2)}
+.viewtabs button{display:inline-flex;align-items:center;gap:7px;border:0;background:transparent;padding:7px 14px;border-radius:9px;font-weight:500;font-size:.88rem;color:var(--mute)}
+.viewtabs button svg{width:15px;height:15px}
+.viewtabs button[aria-selected="true"]{background:var(--surface);color:var(--text);box-shadow:0 1px 2px rgba(16,24,40,.08),0 2px 8px -3px rgba(16,24,40,.14)}
+/* all-venues map */
+.allmap-wrap{position:relative;border-radius:24px;overflow:hidden;border:1px solid var(--border);box-shadow:var(--shadow);background:var(--bg-2)}
+#allmap{height:clamp(420px,70vh,720px);width:100%}
+.allmap-status{position:absolute;top:14px;left:50%;transform:translateX(-50%);padding:8px 14px;border-radius:999px;font-size:.85rem;font-weight:500;white-space:nowrap}
+.vpin{display:inline-flex;align-items:center;gap:5px;padding:3px 8px 3px 5px;border-radius:999px;background:#fff;border:1px solid var(--border-2);
+  box-shadow:0 2px 8px -2px rgba(16,24,40,.25);font:600 12px/1.2 var(--font);color:var(--text);cursor:pointer}
+.vpin:hover,.vpin:focus-visible{z-index:5;transform:scale(1.08)}
+.vpin i,.maplegend i,.pop-wx i{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--c,#9AA3B2);flex:none}
+.vpin.live{box-shadow:0 0 0 2px var(--warn),0 2px 8px -2px rgba(16,24,40,.25)}
+.c-fair{--c:#2F9E44}.c-rain{--c:#4F5FE8}.c-storm{--c:#D1293D}.c-wind{--c:#0E9F8F}.c-hot{--c:#E07A00}.c-cold{--c:#7C5CE0}.c-dome{--c:#9AA3B2}.c-na{--c:#C9CED6}
+.maplegend{display:flex;flex-wrap:wrap;gap:8px 16px;margin:12px 2px 0;font-size:.82rem;color:var(--mute)}
+.maplegend span{display:inline-flex;align-items:center;gap:6px}
+.maplegend .lg-live i{background:#fff;box-shadow:0 0 0 2px var(--warn)}
+.maplibregl-popup-content{border-radius:14px!important;padding:12px 14px!important;box-shadow:0 10px 30px -10px rgba(16,24,40,.35)!important;font-family:var(--font)}
+.pop{display:flex;flex-direction:column;gap:3px;font-size:.84rem;color:var(--mute)}
+.pop b{color:var(--text);font-size:.95rem;font-weight:600}
+.pop-lg{font-size:.72rem;font-weight:600;color:var(--faint)} .pop-lg em{font-style:normal;color:var(--warn);margin-left:4px}
+.pop-wx{display:flex;align-items:center;gap:6px;color:var(--text);margin-top:2px}
+.pop a{margin-top:6px;color:var(--wind);font-weight:600;text-decoration:none}
 /* league picker: one segmented track per sport */
 .leagues{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 14px;min-width:0}
 .lgroup{display:flex;flex-direction:column;gap:6px;flex:none}
@@ -164,6 +190,16 @@ header.top{padding:40px 0 4px}
 .livedot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--warn);margin-right:7px;vertical-align:1px;box-shadow:0 0 0 0 rgba(209,41,61,.5);animation:pulse 1.8s infinite}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(209,41,61,.45)}70%{box-shadow:0 0 0 8px rgba(209,41,61,0)}100%{box-shadow:0 0 0 0 rgba(209,41,61,0)}}
 .g-src{margin:10px 0 2px;font-size:.8rem;color:var(--faint)}
+.bolt{width:15px;height:15px;flex:none}
+.bolt-strip{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 10px;margin:0 0 14px;padding:10px 14px;border-radius:12px;font-size:.88rem;border:1px solid}
+.bolt-strip .bolt{align-self:center}
+.bolt-strip b{font-weight:600}
+.bolt-strip span{color:var(--mute)}
+.bolt-strip.low{background:#FFFBEB;border-color:#FDE68A;color:#92400E}
+.bolt-strip.mod{background:#FFF4E5;border-color:#FDBA74;color:#9A3412}
+.bolt-strip.high{background:#FEF3F2;border-color:#FECDCA;color:#B42318}
+.trends li.storm::before{background:var(--warn)}
+td.thr{color:var(--warn);font-weight:600}
 .glance .scrub{border-top:1px solid var(--border);margin-top:4px;padding-top:14px}
 @media (max-width:900px){
   .g-grid{grid-template-columns:1fr 1fr}
@@ -203,6 +239,8 @@ button,.game,.hr,.chip,.day{touch-action:manipulation;-webkit-tap-highlight-colo
   .leagues{gap:10px 10px}
   .chip{padding:8px 11px;gap:6px}
   .search{flex-basis:100%}
+  #allmap{height:clamp(360px,62vh,560px);height:clamp(360px,62svh,560px)}
+  .allmap-wrap{border-radius:18px}
   #map{height:clamp(320px,56vh,460px);height:clamp(320px,56svh,460px)}
   .mapwrap{border-radius:18px}
   .compass{width:64px;height:64px;left:10px;top:10px}
@@ -298,7 +336,7 @@ td.t{font-weight:600}
     <header class="top">
       <div class="brand">
         <h1>Gameday Sky</h1>
-        <p>Pick a game, race or golf round. Get the National Weather Service forecast for that stadium or track, hour by hour, with the wind drawn over it.</p>
+        <p>Pick a game or race. Get the National Weather Service forecast for that stadium or track, hour by hour, with the wind drawn over it.</p>
       </div>
       <div class="controls">
         <div class="leagues" role="group" aria-label="Leagues" id="chips"></div>
@@ -306,8 +344,22 @@ td.t{font-weight:600}
       </div>
       <nav class="days" id="days" aria-label="Choose a date"></nav>
     </header>
-    <p class="note" id="listnote">Times shown in your time zone.</p>
+    <div class="viewbar">
+      <div class="viewtabs" role="tablist" aria-label="View">
+        <button role="tab" data-view="list" aria-selected="true"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>List</button>
+        <button role="tab" data-view="map" aria-selected="false"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14.5s-4.5-4.3-4.5-7.8a4.5 4.5 0 0 1 9 0c0 3.5-4.5 7.8-4.5 7.8z" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="6.7" r="1.6" fill="currentColor"/></svg>Map</button>
+      </div>
+      <p class="note" id="listnote">Times shown in your time zone.</p>
+    </div>
     <div id="list"></div>
+    <section id="mapview" hidden>
+      <div class="allmap-wrap"><div id="allmap" role="region" aria-label="Map of every venue on this date"></div><div class="allmap-status glass" id="mapstatus" hidden></div></div>
+      <div class="maplegend">
+        <span class="c-fair"><i></i>Fair</span><span class="c-rain"><i></i>Rain likely</span><span class="c-storm"><i></i>Thunderstorms</span>
+        <span class="c-wind"><i></i>Windy</span><span class="c-hot"><i></i>Hot</span><span class="c-cold"><i></i>Cold or snow</span><span class="c-dome"><i></i>Indoors</span><span class="lg-live"><i></i>Live now</span>
+      </div>
+      <p class="fine" style="margin-top:12px">Pins show the forecast at each start time from Open-Meteo, for a quick look. Tap a pin, then open the full forecast for National Weather Service detail.</p>
+    </section>
   </main>
   <main id="detail-view" hidden>
     <button class="back" id="back">&larr; Full schedule</button>
@@ -327,8 +379,6 @@ const LEAGUES = {
   oreilly:{label:"O'Reilly", kind:'racing', series:2, espn:'racing/nascar-secondary', dur:2.5, full:"NASCAR O'Reilly Auto Parts Series (formerly Xfinity)"},
   truck:{label:'Trucks', kind:'racing', series:3, espn:'racing/nascar-truck', dur:2, full:'NASCAR Craftsman Truck Series'},
   arca:{label:'ARCA', kind:'racing', series:4, dur:1.75, full:'ARCA Menards Series'},
-  pga:{label:'PGA', path:'golf/pga', kind:'golf', full:'PGA Tour'},
-  lpga:{label:'LPGA', path:'golf/lpga', kind:'golf', full:'LPGA Tour'},
 };
 const startLabel=kind=>kind==='baseball'?'First pitch':kind==='racing'?'Green flag':kind==='golf'?'First tee':'Kickoff';
 const eventWord=kind=>kind==='racing'?'race':kind==='golf'?'round':'game';
@@ -464,7 +514,7 @@ const ymd = d=>`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${Str
 
 /* ================= state ================= */
 const state = {
-  leagues:new Set(store.get('leagues3')||Object.keys(LEAGUES)),
+  leagues:new Set((store.get('leagues3')||Object.keys(LEAGUES)).filter(k=>LEAGUES[k])), view:store.get('view')==='map'?'map':'list',
   day:0, query:'', games:[], byId:new Map(), errors:{}, loading:false, cache:new Map(), viewToken:0,
 };
 
@@ -695,9 +745,130 @@ function isOver(g){
   return Date.parse(g.date)+(hrs+3)*HOUR<Date.now(); // fallback when a feed has no live status
 }
 
+/* ================= lightning helpers ================= */
+const boltSVG='<svg class="bolt" viewBox="0 0 16 16" aria-hidden="true"><path d="M9.6 1 3 9.2h4.1L5.8 15 13 6.6H8.9L9.6 1z" fill="currentColor"/></svg>';
+function boltLevel(p){return p>=35?{k:'high',t:'High'}:p>=15?{k:'mod',t:'Moderate'}:p>=5?{k:'low',t:'Low'}:{k:'min',t:'Very low'};}
+const delayRule=kind=>kind==='racing'?'Cars come off the track when lightning is within about 8 miles, and each new strike restarts a 30-minute clock.'
+  :'Play stops when lightning is within about 8 miles, and each new strike restarts a 30-minute clock.';
+function boltStrip(lv,detailText){
+  return `<div class="bolt-strip ${lv.k}">${boltSVG}<b>Lightning delay risk: ${lv.t}</b><span>${esc(detailText)}</span></div>`;
+}
+
+/* ================= all-venues map ================= */
+const vmap={map:null,markers:[],token:0,wx:new Map(),sig:''};
+let mapTimer=null;
+function scheduleMap(){clearTimeout(mapTimer); mapTimer=setTimeout(updateMap,60);}
+function visibleGames(){
+  const q=state.query.trim().toLowerCase();
+  let games=state.games.filter(g=>state.leagues.has(g.league)&&!isOver(g));
+  if(q) games=games.filter(g=>[g.home.name,g.away?.name,g.home.abbr,g.away?.abbr,g.venue.name,g.venue.city,g.venue.state,g.racing?LEAGUES[g.league].full:''].join(' ').toLowerCase().includes(q));
+  return games;
+}
+function quickVenue(g){ // venue coordinates without a network call (built-in tables or cached lookups)
+  const L=LEAGUES[g.league];
+  if(L.kind==='racing') return store.get('geo:'+g.venue.id);
+  const table=L.kind==='baseball'?MLB:g.league==='nfl'?NFL:null; let base=table&&table[g.home.abbr];
+  if(base&&(g.neutral||!sameCity(base.city,g.venue.city))) base=null;
+  return base||store.get('geo:'+(g.venue.id||g.venue.name+g.venue.city));
+}
+function mapStatus(t){const el=$('#mapstatus'); el.textContent=t; el.hidden=!t;}
+function wxCat(w,dome){
+  if(dome) return {k:'dome',t:'Indoors'};
+  if(!w) return {k:'na',t:''};
+  if(w.code>=95) return {k:'storm',t:'Thunderstorms'};
+  if((w.code>=71&&w.code<=77)||w.code===85||w.code===86) return {k:'cold',t:'Snow'};
+  if(w.pop>=50||(w.code>=61&&w.code<=82)) return {k:'rain',t:'Rain likely'};
+  if((w.gust||0)>=28||w.wind>=18) return {k:'wind',t:'Windy'};
+  if(w.temp>=90) return {k:'hot',t:'Hot'};
+  if(w.temp<=35) return {k:'cold',t:'Cold'};
+  return {k:'fair',t:'Fair'};
+}
+function eventTitle(g){return g.racing?g.race.name:`${g.away?.short||g.away?.name||'TBD'} at ${g.home.short||g.home.name}`;}
+function pinPopup(p){
+  const g=p.g, w=p.w, cat=wxCat(w,p.dome);
+  const when=new Date(g.date).toLocaleString('en-US',{weekday:'short',hour:'numeric',minute:'2-digit'});
+  const line=p.dome?'Indoor stadium':w?`${rnd(w.temp)}°, ${w.pop}% rain, wind ${rnd(w.wind)} mph${w.gust>=w.wind+5?` (gusts ${rnd(w.gust)})`:''}`:'Loading weather…';
+  return `<div class="pop"><span class="pop-lg">${esc(LEAGUES[g.league].label)}${p.live?' <em>Live</em>':''}</span><b>${esc(eventTitle(g))}</b>
+    <span>${esc(when)}, ${esc(g.venue.name||'')}</span><span class="pop-wx c-${cat.k}">${cat.t?`<i></i>${esc(cat.t)}: `:''}${esc(line)}</span>
+    <a href="#/g/${g.league}/${esc(g.id)}">Open full forecast &rarr;</a></div>`;
+}
+function paintPin(p){
+  const cat=wxCat(p.w,p.dome);
+  p.el.className=`vpin c-${cat.k}${p.live?' live':''}`;
+  p.el.innerHTML=`<i></i><b>${p.dome?'Dome':p.w?rnd(p.w.temp)+'°':'…'}</b>`;
+  p.el.setAttribute('aria-label',`${eventTitle(p.g)}: ${cat.t||'weather loading'}`);
+  p.mk.getPopup().setHTML(pinPopup(p));
+}
+async function paintWx(list,tk){
+  const need=list.filter(p=>!p.dome&&!p.w);
+  const now=floorHour(Date.now());
+  const hourKey=p=>new Date(Math.max(floorHour(Date.parse(p.g.date)),now)).toISOString().slice(0,13)+':00';
+  const todo=[];
+  for(const p of need){const k=`${p.v.lat.toFixed(3)},${p.v.lon.toFixed(3)},${hourKey(p)}`; p.key=k; if(vmap.wx.has(k)){p.w=vmap.wx.get(k); paintPin(p);} else todo.push(p);}
+  for(let i=0;i<todo.length;i+=50){
+    const chunk=todo.slice(i,i+50);
+    try{
+      const j=await getJSON(`https://api.open-meteo.com/v1/forecast?latitude=${chunk.map(p=>p.v.lat.toFixed(4)).join(',')}&longitude=${chunk.map(p=>p.v.lon.toFixed(4)).join(',')}`+
+        `&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m,wind_gusts_10m&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=GMT&forecast_days=16`,{tries:2,timeout:15000});
+      if(tk!==vmap.token) return;
+      const arr=Array.isArray(j)?j:[j];
+      chunk.forEach((p,n)=>{
+        const H=arr[n]?.hourly; if(!H) return; const idx=H.time.indexOf(hourKey(p)); if(idx<0) return;
+        p.w={temp:H.temperature_2m[idx],pop:H.precipitation_probability[idx]??0,code:H.weather_code[idx]??0,wind:H.wind_speed_10m[idx]??0,gust:H.wind_gusts_10m[idx]??0};
+        vmap.wx.set(p.key,p.w); paintPin(p);
+      });
+    }catch{}
+  }
+}
+async function updateMap(){
+  if(state.view!=='map'||$('#list-view').hidden) return;
+  if(!window.maplibregl||typeof maplibregl.LngLatBounds!=='function'){mapStatus("The map couldn't load on this connection. The list view still works.");return;}
+  await pickStyle();
+  if(!vmap.map){
+    vmap.map=new maplibregl.Map({container:'allmap',style:state.mapStyle,center:[-96,38.5],zoom:3.2,attributionControl:{compact:true},
+      cooperativeGestures:matchMedia('(pointer: coarse)').matches,dragRotate:false,pitchWithRotate:false});
+    vmap.map.addControl(new maplibregl.NavigationControl({showCompass:false}),'bottom-right');
+    vmap.map.touchZoomRotate.disableRotation();
+  } else vmap.map.resize();
+  if(state.loading){mapStatus('Loading schedules…');return;}
+  const games=visibleGames();
+  const sig=ymd(dayDate(state.day))+'|'+games.map(g=>g.league+g.id+(g.status?.state||'')).join(',');
+  if(sig===vmap.sig&&vmap.markers.length) return; // nothing changed since the last draw
+  vmap.sig=sig;
+  const tk=++vmap.token;
+  vmap.markers.forEach(m=>m.remove()); vmap.markers=[];
+  if(!games.length){mapStatus('Nothing to show for this date and these leagues.');return;}
+  const placed=[], bounds=new maplibregl.LngLatBounds();
+  const fit=anim=>{if(placed.length) vmap.map.fitBounds(bounds,{padding:{top:60,bottom:50,left:40,right:40},maxZoom:placed.length===1?9:7,duration:anim&&!reduceMotion?800:0});};
+  const add=(g,v)=>{
+    const el=document.createElement('button'); el.type='button';
+    const p={g,v,el,live:g.status?.state==='in',dome:v.roof==='dome'||roofTag(g)==='Dome'};
+    p.mk=new maplibregl.Marker({element:el,anchor:'center'}).setLngLat([v.lon,v.lat]).setPopup(new maplibregl.Popup({offset:16,closeButton:false,maxWidth:'280px'})).addTo(vmap.map);
+    vmap.markers.push(p.mk); placed.push(p); bounds.extend([v.lon,v.lat]); paintPin(p);
+  };
+  const slow=[];
+  for(const g of games){const v=quickVenue(g); if(v) add(g,v); else slow.push(g);}
+  fit(false); mapStatus(slow.length?`Finding ${slow.length} more venue${slow.length>1?'s':''}…`:'');
+  await paintWx(placed.slice(),tk);
+  for(let i=0;i<slow.length;i++){
+    if(tk!==vmap.token) return;
+    mapStatus(`Finding ${slow.length-i} more venue${slow.length-i>1?'s':''}…`);
+    try{const v=await resolveVenue(slow[i]); if(tk!==vmap.token) return; add(slow[i],v);}catch{}
+    await sleep(1100); // be polite to the free geocoder
+    if((i+1)%6===0||i===slow.length-1){fit(true); paintWx(placed,tk);}
+  }
+  if(tk===vmap.token) mapStatus('');
+}
+function setView(v){
+  state.view=v; store.set('view',v);
+  document.querySelectorAll('.viewtabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.view===v));
+  $('#list').hidden=v!=='list'; $('#mapview').hidden=v!=='map';
+  if(v==='map') scheduleMap();
+}
+
 /* ================= list view ================= */
 function renderChips(){
-  const groups=[['Baseball','baseball'],['Football','football'],['NASCAR','racing'],['Golf','golf']];
+  const groups=[['Baseball','baseball'],['Football','football'],['NASCAR','racing']];
   const all=Object.keys(LEAGUES).every(k=>state.leagues.has(k));
   $('#chips').innerHTML=groups.map(([label,kind])=>{
     const keys=Object.keys(LEAGUES).filter(k=>LEAGUES[k].kind===kind);
@@ -734,6 +905,7 @@ function roofTag(g){
   return roof==='dome'?'Dome':roof==='retractable'?'Retractable roof':roof==='canopy'?'Covered':'';
 }
 function renderList(){
+  if(state.view==='map') scheduleMap();
   const box=$('#list');
   if(state.loading){box.innerHTML='<p class="empty">Loading schedules…</p>'; return;}
   const q=state.query.trim().toLowerCase();
@@ -936,7 +1108,7 @@ async function loadNWS(lat,lon){
     getJSON(pr.forecast,{tries:2}), getJSON(`https://api.weather.gov/alerts/active?point=${pt}`,{tries:1})]);
   const g=grid.status==='fulfilled'?grid.value.properties:{};
   const S={gust:gridSeries(g.windGust),feels:gridSeries(g.apparentTemperature),sky:gridSeries(g.skyCover),
-    qpf:gridSeries(g.quantitativePrecipitation),dir:gridSeries(g.windDirection),spd:gridSeries(g.windSpeed)};
+    qpf:gridSeries(g.quantitativePrecipitation),dir:gridSeries(g.windDirection),spd:gridSeries(g.windSpeed),thunder:gridSeries(g.probabilityOfThunder)};
   const hours=hr.status==='fulfilled'?(hr.value.properties.periods||[]).map(p=>{
     const t=Date.parse(p.startTime);
     const dew=p.dewpoint?(/degC/.test(p.dewpoint.unitCode)?c2f(p.dewpoint.value):p.dewpoint.value):null;
@@ -944,7 +1116,8 @@ async function loadNWS(lat,lon){
     return {t, temp:p.temperatureUnit==='C'?c2f(p.temperature):p.temperature, pop:p.probabilityOfPrecipitation?.value??0,
       rh:p.relativeHumidity?.value??null, dew, mph:parseWind(p.windSpeed), card:p.windDirection,
       dir:dirG?dirG.v:card2deg(p.windDirection), gust:toMph(S.gust(t)), feels:toF(S.feels(t)), sky:S.sky(t)?.v??null,
-      qpf:null, short:p.shortForecast, day:p.isDaytime};
+      qpf:null, short:p.shortForecast, day:p.isDaytime,
+      thunder:Math.round(Math.max(S.thunder(t)?.v??0,/thunder/i.test(p.shortForecast||'')?(p.probabilityOfPrecipitation?.value??0):0))};
   }):[];
   // spread grid precip totals evenly across their intervals
   if(g.quantitativePrecipitation){
@@ -1160,8 +1333,8 @@ function renderDetail(g,kind,venue,wx,orient){
       :`The hourly forecast didn't load${wx.hourlyErr?` (${esc(wx.hourlyErr.message)})`:''}. Reload to try again.`;
   }
 
-  const alerts=(wx.alerts||[]).map(a=>`<div class="alert"><b>${esc(a.event)}</b>${esc(a.headline||'')}</div>`).join('');
-  body.innerHTML=`${alerts}${msg?`<p class="status err">${msg}</p>`:''}
+  const alertsHTML=list=>(list||[]).map(a=>`<div class="alert"><b>${esc(a.event)}</b>${esc(a.headline||'')}</div>`).join('');
+  body.innerHTML=`<div id="alerts">${alertsHTML(wx.alerts)}</div>${msg?`<p class="status err">${msg}</p>`:''}
   <section class="glance" aria-label="Game-time conditions"><div id="now" aria-live="polite"></div>
       ${scrub.length?`<div class="scrub" id="scrub" role="group" aria-label="Choose an hour">${scrub.map(h=>{
         const i=hours.indexOf(h); const rel=h.t<floorHour(anchorT)?(kind==='racing'?'Pre-race':kind==='golf'?'Early':'Pregame'):h.t===floorHour(anchorT)?(over?'Now':startLabel(kind)):inWord;
@@ -1271,7 +1444,9 @@ function renderDetail(g,kind,venue,wx,orient){
     const head=h.fromPeriod?`${esc(period.name)} forecast`:isKick?`At ${startWord}, ${fTime(t0,tz)}`:over&&sel===kickIdx?`Now, ${fHour(h.t,tz)}`:`At ${fHour(h.t,tz)}`;
     const gust=h.gust&&h.gust>(h.mph||0)+4?rnd(h.gust):null;
     const row=(k,v)=>`<div><dt>${k}</dt><dd>${v??'–'}</dd></div>`;
-    box.innerHTML=`<div class="g-top"><div><span class="g-when">${head}</span><p class="g-verdict">${esc(verdict(h))}</p></div></div>
+    const tlv=boltLevel(h.thunder||0);
+    const strip=venue.roof!=='dome'&&(h.thunder||0)>=5?boltStrip(tlv,`${h.thunder}% chance of thunder ${h.fromPeriod?'in this period':'this hour'}.${tlv.k==='high'||tlv.k==='mod'?' '+delayRule(kind):''}`):'';
+    box.innerHTML=`<div class="g-top"><div><span class="g-when">${head}</span><p class="g-verdict">${esc(verdict(h))}</p></div></div>${strip}
       <div class="g-grid">
         <div class="g-cell g-temp"><span class="g-lbl">Temperature</span><div class="g-big">${rnd(h.temp)}°</div>
           <span class="g-sub"><b>${esc(h.short||'')}</b>${h.feels!=null?`<br>Feels like ${rnd(h.feels)}°`:''}</span></div>
@@ -1288,7 +1463,15 @@ function renderDetail(g,kind,venue,wx,orient){
     const row=(k,v)=>`<div><dt>${k}</dt><dd>${v??'–'}</dd></div>`;
     const src=h.obs?`Observed ${fTime(h.t,tz)} at ${esc(h.station)}${h.miles!=null&&h.miles<999?` (${Math.round(h.miles)} mi away)`:''}${h.tempFrom?`, with temperature from ${esc(h.tempFrom)}`:''}.${h.windFrom?'':' No nearby airport reported wind.'} Updates every 5 minutes.`
       :'No recent station report, so this is the forecast for the current hour.';
-    box.innerHTML=`<div class="g-top"><div><span class="g-when"><span class="livedot"></span>Live at the venue</span><p class="g-verdict">${esc(verdict(h))}</p></div></div>
+    const warnA=(wx.alerts||[]).find(a=>/severe thunderstorm warning|tornado warning/i.test(a.event||''));
+    const nowH=hours.find(x=>x.t===floorHour(Date.now()));
+    const heard=h.obs&&/thunder/i.test(h.short||'');
+    let strip='';
+    if(venue.roof!=='dome'){
+      if(heard||warnA) strip=boltStrip({k:'high',t:'High'},`${heard?`Thunder reported at ${h.station}.`:`${warnA.event} in effect.`} ${delayRule(kind)}`);
+      else if(nowH&&nowH.thunder>=5) strip=boltStrip(boltLevel(nowH.thunder),`${nowH.thunder}% chance of thunder this hour.`);
+    }
+    box.innerHTML=`<div class="g-top"><div><span class="g-when"><span class="livedot"></span>Live at the venue</span><p class="g-verdict">${esc(verdict(h))}</p></div></div>${strip}
       <div class="g-grid">
         <div class="g-cell g-temp"><span class="g-lbl">Temperature</span><div class="g-big">${rnd(h.temp)}°</div>
           <span class="g-sub"><b>${esc(h.short||'')}</b>${h.feels!=null&&Math.abs(h.feels-h.temp)>=1?`<br>Feels like ${rnd(h.feels)}°`:''}</span></div>
@@ -1308,8 +1491,10 @@ function renderDetail(g,kind,venue,wx,orient){
   loadAlmanac(g,kind,live?null:covered&&!over?hours[kickIdx]:periodHour,state.viewToken);
   if(live){ // pull current observations now and every 5 minutes
     const refresh=async()=>{
-      const o=await loadObs(wx.stationsUrl,venue.lat,venue.lon).catch(()=>null);
+      const [o,al]=await Promise.all([loadObs(wx.stationsUrl,venue.lat,venue.lon).catch(()=>null),
+        getJSON(`https://api.weather.gov/alerts/active?point=${venue.lat.toFixed(4)},${venue.lon.toFixed(4)}`,{tries:1}).catch(()=>null)]);
       if(token!==state.viewToken) return;
+      if(al){ wx.alerts=(al.features||[]).map(f=>f.properties); $('#alerts').innerHTML=alertsHTML(wx.alerts); }
       if(o) liveHour=o; else if(!liveHour||!liveHour.obs) liveHour={...(hours.find(h=>h.t===floorHour(Date.now()))||periodHour||{}),fallback:true};
       updateHour(-1);
     };
@@ -1346,6 +1531,13 @@ function renderDetail(g,kind,venue,wx,orient){
     }
     if(pre.length&&!over&&kind!=='golf'){const lo=Math.min(...pre.map(h=>h.temp)),hi=Math.max(...pre.map(h=>h.temp)),pp=Math.max(...pre.map(h=>h.pop||0));
       items.push({c:pp>=40?'wet':'',b:kind==='football'?'Tailgate window':kind==='racing'?'Pre-race':'Before the game',p:`${fHour(pre[0].t,tz)} to ${fHour(k.t,tz)}: ${rnd(lo)===rnd(hi)?rnd(hi)+'°':`${rnd(lo)}° to ${rnd(hi)}°`}, rain chance up to ${pp}%.`});}
+    if(venue.roof!=='dome'){
+      const mt=win.reduce((a,h)=>(h.thunder||0)>(a.thunder||0)?h:a,win[0]||k), tp=mt.thunder||0, lv=boltLevel(tp);
+      const it={c:lv.k==='high'||lv.k==='mod'?'storm':'',b:`Lightning delay risk: ${lv.t}`,
+        p:tp>=15?`Thunder chance peaks at ${tp}% around ${fHour(mt.t,tz)}. ${delayRule(kind)}${venue.roof==='retractable'?' This only matters if the roof is open.':''}`
+          :tp>=5?`A small chance of thunder, up to ${tp}% around ${fHour(mt.t,tz)}.`:`No thunderstorms expected during the ${eventWord(kind)}.`};
+      tp>=15?items.unshift(it):items.push(it);
+    }
     $('#trends').innerHTML=items.map(i=>`<li class="${i.c}"><b>${esc(i.b)}</b>${esc(i.p)}</li>`).join('');
   }
   function renderChart(){
@@ -1379,18 +1571,19 @@ function renderDetail(g,kind,venue,wx,orient){
       ${grid}${bars}
       <path d="${path('feels')}" fill="none" stroke="#DC3F44" stroke-width="2" stroke-dasharray="5 5"/>
       <path d="${path('temp')}" fill="none" stroke="#D98200" stroke-width="3" stroke-linejoin="round"/>
+      ${hs.filter(h=>(h.thunder||0)>=15).map(h=>`<path transform="translate(${x(h.t)-5},${pt-18}) scale(0.7)" d="M9.6 1 3 9.2h4.1L5.8 15 13 6.6H8.9L9.6 1z" fill="#D1293D"><title>${fHour(h.t,tz)}: ${h.thunder}% chance of thunder</title></path>`).join('')}
       ${pts}${labels}
       <text x="${pl-8}" y="${plotB+52}" text-anchor="end" fill="#6B7485" font-size="11">wind</text>
       <text x="${pl-8}" y="${plotB+74}" text-anchor="end" fill="#6B7485" font-size="11">mph</text>${winds}
-    </svg><div class="legend"><span><i style="background:#D98200"></i>Temperature</span><span><i style="background:repeating-linear-gradient(90deg,#DC3F44 0 5px,transparent 5px 9px)"></i>Feels like</span><span><i style="background:#6D7BF0;height:10px;width:10px;opacity:.7"></i>Rain chance</span><span>Arrows point where the wind is blowing</span></div>`;
+    </svg><div class="legend"><span><i style="background:#D98200"></i>Temperature</span><span><i style="background:repeating-linear-gradient(90deg,#DC3F44 0 5px,transparent 5px 9px)"></i>Feels like</span><span><i style="background:#6D7BF0;height:10px;width:10px;opacity:.7"></i>Rain chance</span><span><svg viewBox="0 0 16 16" width="12" height="12" style="vertical-align:-1px;margin-right:4px"><path d="M9.6 1 3 9.2h4.1L5.8 15 13 6.6H8.9L9.6 1z" fill="#D1293D"/></svg>Thunder 15%+</span><span>Arrows point where the wind is blowing</span></div>`;
   }
   function renderTable(){
     const rows=hours.map((h,i)=>({h,i})).filter(({h})=>h.t>=floorHour(anchorT)-2*HOUR&&h.t<=anchorT+dur+1*HOUR);
-    $('#htable').innerHTML=`<thead><tr><th>Time</th><th>Sky</th><th>Temp</th><th>Feels</th><th>Wind</th><th>Gusts</th><th>Humidity</th><th>Dew pt</th><th>Rain chance</th><th>Rain</th></tr></thead><tbody>${
+    $('#htable').innerHTML=`<thead><tr><th>Time</th><th>Sky</th><th>Temp</th><th>Feels</th><th>Wind</th><th>Gusts</th><th>Humidity</th><th>Dew pt</th><th>Rain chance</th><th>Thunder</th><th>Rain</th></tr></thead><tbody>${
       rows.map(({h,i})=>`<tr data-i="${i}" class="${h.t>=floorHour(anchorT)&&h.t<=anchorT+dur?'game-hr':''}">
         <td class="t">${fHour(h.t,tz)}</td><td>${esc(h.short||'')}</td><td class="t">${rnd(h.temp)}°</td><td>${h.feels!=null?rnd(h.feels)+'°':'–'}</td>
         <td>${h.mph??'–'} ${esc(h.card||'')}</td><td>${h.gust!=null?rnd(h.gust):'–'}</td><td>${h.rh!=null?h.rh+'%':'–'}</td>
-        <td>${h.dew!=null?rnd(h.dew)+'°':'–'}</td><td>${h.pop??0}%</td><td>${h.qpf!=null?(h.qpf<0.005?'0':h.qpf.toFixed(2))+' in':'–'}</td></tr>`).join('')}</tbody>`;
+        <td>${h.dew!=null?rnd(h.dew)+'°':'–'}</td><td>${h.pop??0}%</td><td class="${(h.thunder||0)>=15?'thr':''}">${h.thunder||0}%</td><td>${h.qpf!=null?(h.qpf<0.005?'0':h.qpf.toFixed(2))+' in':'–'}</td></tr>`).join('')}</tbody>`;
     $('#htable tbody').addEventListener('click',e=>{const r=e.target.closest('tr');if(r&&$(`#scrub [data-i="${r.dataset.i}"]`))updateHour(+r.dataset.i);});
   }
   function renderPeriods(){
@@ -1562,7 +1755,7 @@ async function loadAlmanac(g,kind,now,token){
 function route(){
   const m=location.hash.match(new RegExp(`^#/g/(${Object.keys(LEAGUES).join('|')})/([\\w-]+)(?:/(\\d{8}))?$`));
   if(m) showGame(m[1],m[2],m[3]);
-  else{ state.viewToken++; teardown(); $('#detail-view').hidden=true; $('#list-view').hidden=false; if(!state.games.length&&!state.loading) loadDay(); else requestAnimationFrame(()=>scrollTo(0,state.listY||0)); }
+  else{ state.viewToken++; teardown(); $('#detail-view').hidden=true; $('#list-view').hidden=false; if(!state.games.length&&!state.loading) loadDay(); else requestAnimationFrame(()=>scrollTo(0,state.listY||0)); if(state.view==='map') scheduleMap(); }
 }
 $('#chips').addEventListener('click',e=>{
   const b=e.target.closest('.chip,.lgl,.allbtn'); if(!b) return;
@@ -1581,7 +1774,8 @@ $('#search').addEventListener('input',e=>{state.query=e.target.value;renderList(
 $('#list').addEventListener('click',e=>{const b=e.target.closest('[data-go]');if(b)location.hash='#/g/'+b.dataset.go;});
 $('#back').addEventListener('click',()=>{ location.hash=''; });
 window.addEventListener('hashchange',route);
-renderChips(); renderDays(); route();
+renderChips(); renderDays(); setView(state.view); route();
+document.querySelector('.viewtabs').addEventListener('click',e=>{const b=e.target.closest('[data-view]'); if(b) setView(b.dataset.view);});
 setInterval(()=>{ if(!$('#list-view').hidden&&!document.hidden&&!state.loading) loadDay(true); },2*60e3);
 setInterval(()=>{ if(!$('#list-view').hidden) renderList(); },60e3);
 if(location.hash) loadDay();
