@@ -51,11 +51,13 @@ header.top{padding:40px 0 4px}
 .allmap-wrap{position:relative;border-radius:24px;overflow:hidden;border:1px solid var(--border);box-shadow:var(--shadow);background:var(--bg-2)}
 #allmap{height:clamp(420px,70vh,720px);width:100%}
 .allmap-status{position:absolute;top:14px;left:50%;transform:translateX(-50%);padding:8px 14px;border-radius:999px;font-size:.85rem;font-weight:500;white-space:nowrap}
+.vpin-host{border:0;background:none;padding:0;cursor:pointer}
+.vpin-host:hover,.vpin-host:focus-visible{z-index:5}
 .vpin{display:inline-flex;align-items:center;gap:5px;padding:3px 8px 3px 5px;border-radius:999px;background:#fff;border:1px solid var(--border-2);
-  box-shadow:0 2px 8px -2px rgba(16,24,40,.25);font:600 12px/1.2 var(--font);color:var(--text);cursor:pointer}
-.vpin:hover,.vpin:focus-visible{z-index:5;transform:scale(1.08)}
+  box-shadow:0 2px 8px -2px rgba(16,24,40,.25);font:600 12px/1.2 var(--font);color:var(--text);transition:transform .12s}
+.vpin-host:hover .vpin,.vpin-host:focus-visible .vpin{transform:scale(1.1)}
 .vpin i,.maplegend i,.pop-wx i{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--c,#9AA3B2);flex:none}
-.vpin.live{box-shadow:0 0 0 2px var(--warn),0 2px 8px -2px rgba(16,24,40,.25)}
+.vpin-host.live .vpin{box-shadow:0 0 0 2px var(--warn),0 2px 8px -2px rgba(16,24,40,.25)}
 .c-fair{--c:#2F9E44}.c-rain{--c:#4F5FE8}.c-storm{--c:#D1293D}.c-wind{--c:#0E9F8F}.c-hot{--c:#E07A00}.c-cold{--c:#7C5CE0}.c-dome{--c:#9AA3B2}.c-na{--c:#C9CED6}
 .maplegend{display:flex;flex-wrap:wrap;gap:8px 16px;margin:12px 2px 0;font-size:.82rem;color:var(--mute)}
 .maplegend span{display:inline-flex;align-items:center;gap:6px}
@@ -794,8 +796,9 @@ function pinPopup(p){
 }
 function paintPin(p){
   const cat=wxCat(p.w,p.dome);
-  p.el.className=`vpin c-${cat.k}${p.live?' live':''}`;
-  p.el.innerHTML=`<i></i><b>${p.dome?'Dome':p.w?rnd(p.w.temp)+'°':'…'}</b>`;
+  [...p.el.classList].filter(c=>c.startsWith('c-')).forEach(c=>p.el.classList.remove(c));
+  p.el.classList.add('vpin-host','c-'+cat.k); p.el.classList.toggle('live',!!p.live);
+  p.el.innerHTML=`<span class="vpin"><i></i><b>${p.dome?'Dome':p.w?rnd(p.w.temp)+'°':'…'}</b></span>`;
   p.el.setAttribute('aria-label',`${eventTitle(p.g)}: ${cat.t||'weather loading'}`);
   p.mk.getPopup().setHTML(pinPopup(p));
 }
